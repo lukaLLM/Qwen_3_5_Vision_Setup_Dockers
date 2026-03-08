@@ -1,0 +1,45 @@
+name: llama_cpp_qwen3_5_0_8b_q4_k_m
+
+networks:
+  server:
+    driver: bridge
+
+services:
+  llama_cpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: LlamaCpp_Qwen3_5_0_8B_Q4_K_M
+    networks:
+      - server
+    ports:
+      - "8000:8080"
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    gpus: all
+    privileged: true
+    env_file:
+      - ../.env
+    environment:
+      - LLAMA_CACHE=/root/.cache/huggingface/llama.cpp
+    volumes:
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+
+    command:
+      - --model
+      - /root/.cache/huggingface/hub/models--unsloth--Qwen3.5-0.8B-GGUF/snapshots/6ab461498e2023f6e3c1baea90a8f0fe38ab64d0/Qwen3.5-0.8B-Q4_K_M.gguf
+      - --mmproj
+      - /root/.cache/huggingface/hub/models--unsloth--Qwen3.5-0.8B-GGUF/snapshots/6ab461498e2023f6e3c1baea90a8f0fe38ab64d0/mmproj-F16.gguf
+      - --alias
+      - qwen35-0_8b-q4_k_m
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --n-gpu-layers
+      - "all"
+      - --ctx-size
+      - "262144"

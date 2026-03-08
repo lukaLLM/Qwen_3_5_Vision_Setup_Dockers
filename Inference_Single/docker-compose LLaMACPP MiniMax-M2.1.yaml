@@ -1,0 +1,45 @@
+name: llama_cpp_minimax_m2_1_highctx
+
+networks:
+  server:
+    driver: bridge
+
+services:
+  llama_cpp_minimax:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: LlamaCpp_MiniMax_M2_1_Server
+    networks:
+      - server
+    env_file:
+      - ../.env
+    ports:
+      - "8000:8080"
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    gpus: all
+    privileged: true
+    environment:
+      - LLAMA_CACHE=/root/.cache/huggingface/llama.cpp
+    volumes:
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+
+    command:
+      - --model
+      - /root/.cache/huggingface/hub/models--unsloth--MiniMax-M2.1-GGUF/snapshots/8ffdd68efe5bc49af9e6c5c939d2e0331d17804b/Q2_K_L/MiniMax-M2.1-Q2_K_L-00001-of-00002.gguf
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --n-gpu-layers
+      - "all"
+      - --ctx-size
+      - "131072"
+      - --cache-type-k
+      - "q4_0"
+      - --cache-type-v
+      - "q4_0"

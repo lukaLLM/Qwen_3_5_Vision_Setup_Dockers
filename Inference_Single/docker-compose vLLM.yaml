@@ -1,0 +1,38 @@
+name: vLLM_Inference
+
+networks:
+  server:
+    driver: bridge
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vLLM_Inference
+    privileged: true # Helps with GPU hardware counters/management
+    env_file:
+      - ../.env
+    networks:
+      - server
+    ports:
+      - "8000:8000" 
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    gpus: all
+    environment:
+      - HF_HOME=/data/hf
+      - HF_HUB_CACHE=/data/hf/hub
+    volumes:
+      - ${HOME}/.cache/huggingface:/data/hf
+      # You need the below for it to run on RTX PRO 6000
+      #  This is because of incompatibility between the CUDA driver inside the container and the host's NVIDIA driver (590.48.01, CUDA 13.1). This is a known issue with recent NVIDIA drivers (580+), where the CUDA compatibility package inside the vLLM Docker image conflicts with the host's native CUDA support. 
+      - /dev/null:/etc/ld.so.conf.d/00-cuda-compat.conf
+    command:
+      - Qwen/Qwen3-32B-FP8
+      - --gpu_memory_utilization=0.8
+      - --max-model-len=10000
+      #- --max-num-seqs= 128

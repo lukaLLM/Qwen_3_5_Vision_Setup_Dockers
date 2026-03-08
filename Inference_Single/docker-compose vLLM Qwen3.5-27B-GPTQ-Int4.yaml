@@ -1,0 +1,50 @@
+name: vllm_qwen35_27b_gptq_int4
+
+networks:
+  server:
+    driver: bridge
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vLLM_Qwen35_27B_GPTQ_Int4
+    privileged: true
+    env_file:
+      - ../.env
+    networks:
+      - server
+    ports:
+      - "8000:8000"
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    gpus: all
+    environment:
+      - HF_HOME=/data/hf
+      - HF_HUB_CACHE=/data/hf/hub
+    volumes:
+      - ${HOME}/.cache/huggingface:/data/hf
+      - /dev/null:/etc/ld.so.conf.d/00-cuda-compat.conf
+    command:
+      - Qwen/Qwen3.5-27B-GPTQ-Int4
+      - --trust-remote-code
+      - --gpu_memory_utilization
+      - "0.92"
+      - --max-model-len
+      - "32768"
+      - --mm-encoder-tp-mode
+      - data
+      - --mm-processor-cache-type
+      - shm
+      - --reasoning-parser
+      - qwen3
+      - --enable-prefix-caching
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - qwen3_coder
+      - --limit-mm-per-prompt
+      - '{"image":6,"video":2}'
