@@ -1,5 +1,8 @@
 # Qwen Image - Local Inference Setup
 
+## YouTube link with explanation
+- https://youtu.be/-sl0oe3-Awc
+
 ## System Requirements
 
 ### Hardware & OS
