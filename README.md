@@ -30,7 +30,7 @@ source .venv/bin/activate
 uv add hf-transfer huggingface-hub openai
 ```
 
-Add your token in `.env`:
+Add your token in `.env if you want faster download using download_qwen_models.sh etc.
 
 ```bash
 HF_TOKEN=your_huggingface_token_here
@@ -120,3 +120,15 @@ llama.cpp image (`llama_cpp_qwen3_5_122b_a10b_q4_k_m` profile):
 ```bash
 python3 llamacpp_image_call.py --image 2.png --model "qwen35-122b-a10b-q4_k_m"
 ```
+
+## Visual Experimentation App
+
+Run the local FastAPI + Gradio experimentation app:
+
+```bash
+uv run python -m visual_experimentation_app.main
+```
+
+Detailed app docs and API routes:
+
+- `visual_experimentation_app/README.md`

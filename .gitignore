@@ -12,3 +12,7 @@ wheels/
 *.jpeg
 *.mp4
 *.png
+visual_experimentation_app/results/runs/run_*
+visual_experimentation_app/results/run_history.jsonl
+.github/copilot-instructions.md
+visual_experimentation_app/.env.example

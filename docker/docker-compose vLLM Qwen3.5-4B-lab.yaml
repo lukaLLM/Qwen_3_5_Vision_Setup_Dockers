@@ -1,0 +1,77 @@
+name: vllm_qwen3_5_4b_lab
+
+networks:
+  mm_lab:
+    driver: bridge
+
+services:
+  vllm:
+    image: vllm/vllm-openai:cu130-nightly
+    container_name: vllm_qwen3_5_4b_lab
+    privileged: true
+    env_file:
+      - ../.env
+    networks:
+      - mm_lab
+    ports:
+      - "127.0.0.1:8000:8000"
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    gpus: all
+    environment:
+      - HF_HOME=/data/hf
+      - HF_HUB_CACHE=/data/hf/hub
+    volumes:
+      - ${HOME}/.cache/huggingface:/data/hf
+      # Avoid potential CUDA compatibility issues with host driver by using a no-op config file on Blackwell 
+      - /dev/null:/etc/ld.so.conf.d/00-cuda-compat.conf
+    command:
+      # Model to serve.
+      - Qwen/Qwen3.5-4B
+      # OpenAI-compatible server bind settings.
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      # Engine throughput concurrency (increase carefully; can raise VRAM usage).
+      - --max-num-seqs
+      - "1"
+      # Fraction of GPU memory vLLM may use.
+      - --gpu-memory-utilization
+      - "0.5"
+      # Sets the maximum total tokens (input + output) the model can process in a single request; this is the model's context window.  
+      - --max-model-len
+      - "20000"
+      # Multimodal encoder TP behavior (recommended: data for this profile).
+      - --mm-encoder-tp-mode
+      - data
+      # Where MM preprocessor cache lives for video/image tensors shm system ram 
+      - --mm-processor-cache-type
+      - shm
+      # Per-prompt multimodal input caps.
+      - --limit-mm-per-prompt
+      - '{"image":4,"video":2}'
+      # Server media IO behavior (startup arg; requires container recreate to change).
+      # num_frames=-1 means "no fixed frame cap" at media IO stage.
+      - --media-io-kwargs
+      - '{"video":{"num_frames":-1}}'
+      # Default MM sampling behavior. These defaults can be overridden per request
+      # from MM Lab UI/API via extra_body.mm_processor_kwargs.
+      - --mm-processor-kwargs
+      - '{"do_sample_frames":false,"fps":1.0}'
+      # Qwen3 reasoning parser.
+      - --reasoning-parser
+      - qwen3
+      # Prefix cache OFF for strict benchmark consistency (lower variance, slower repeats).
+      # Uncomment the line below for production-like repeated prompt latency.
+      - --enable-prefix-caching
+      # - --no-enable-prefix-caching
+      # # Disable MM processor cache budget (strict no-cache benchmarking).
+      # - --mm-processor-cache-gb
+      # - "0"
+ 

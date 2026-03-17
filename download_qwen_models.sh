@@ -83,7 +83,8 @@ HF_MODELS=(
   "Qwen/Qwen3.5-27B-GPTQ-Int4"
   "Qwen/Qwen3.5-27B-FP8"
   "Qwen/Qwen3.5-0.8B"
-  "Qwen/Qwen3.5-122B-A10B-GPTQ-Int4"
+  "Qwen/Qwen3.5-4B"
+  #"Qwen/Qwen3.5-122B-A10B-GPTQ-Int4"
 
 )
 
