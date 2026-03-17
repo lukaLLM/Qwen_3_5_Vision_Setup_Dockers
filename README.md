@@ -2,6 +2,7 @@
 
 ## YouTube link with explanation
 - https://youtu.be/-sl0oe3-Awc
+- https://www.youtube.com/watch?v=-sl0oe3-Awc
 
 ## System Requirements
 
