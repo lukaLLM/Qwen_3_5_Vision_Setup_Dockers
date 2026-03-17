@@ -8,6 +8,12 @@ This folder provides a local-only experimentation setup for Qwen3.5 multimodal t
 - Timing capture
 - JSON + JSONL run artifacts
 
+## YouTube link with explanation
+- Qwen 3.5 Vision AI Speed Tuning: 30 Seconds → 2 Seconds https://youtu.be/thM6Sz_0YhE
+- Qwen 3.5 Vision – The ONLY LOCAL Setup YOU NEED (No Ollama/LM Studio)!  https://youtu.be/-sl0oe3-Awc
+
+
+## System Requirements
 ## Docker Requirements
 
 - Linux with NVIDIA driver + CUDA-capable GPU
