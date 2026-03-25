@@ -71,25 +71,20 @@ download_or_exit() {
 }
 
 GGUF_MODELS=(
-  "HauhauCS/Qwen3.5-35B-A3B-Uncensored-HauhauCS-Aggressive"
-  "unsloth/Qwen3.5-0.8B-GGUF"
-  "unsloth/Qwen3.5-2B-GGUF"
-  "unsloth/Qwen3.5-9B-GGUF"
-  "unsloth/Qwen3.5-27B-GGUF"
-  "unsloth/Qwen3.5-35B-A3B-GGUF"
-  "unsloth/Qwen3.5-122B-A10B-GGUF"
+  # "unsloth/Qwen3.5-0.8B-GGUF"
+  # "unsloth/Qwen3.5-2B-GGUF"
+  # "unsloth/Qwen3.5-9B-GGUF"
+  # "unsloth/Qwen3.5-27B-GGUF"
+  # "unsloth/Qwen3.5-35B-A3B-GGUF"
+  # "unsloth/Qwen3.5-122B-A10B-GGUF"
 )
 
 HF_MODELS=(
-  "Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled"
-  "zai-org/GLM-OCR"
-  "Qwen/Qwen-Image-Edit-2511"
   "Qwen/Qwen3.5-27B-GPTQ-Int4"
   "Qwen/Qwen3.5-27B-FP8"
-  "Qwen/Qwen3.5-0.8B"
-  "Qwen/Qwen3.5-4B"
-  "Qwen/Qwen3.5-122B-A10B-GPTQ-Int4"
-  
+  "Qwen/Qwen3.5-9B"
+  # "Qwen/Qwen3.5-0.8B"
+  # "Qwen/Qwen3.5-122B-A10B-GPTQ-Int4"
 
 )
 

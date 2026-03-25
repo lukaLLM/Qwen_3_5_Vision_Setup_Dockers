@@ -1,0 +1,226 @@
+# Qwen3.5 Video QA (Unified GUI + API)
+
+This project runs local video QA/classification against a vLLM OpenAI-compatible backend.
+
+- vLLM backend: Docker compose in `docker/`
+- Unified app server (FastAPI + Gradio in one process/port)
+- API: `/v1/*`
+- GUI: `/ui`
+
+## Project Structure
+
+- `src/qwen_image/config.py`: env loading + typed settings
+- `src/qwen_image/prompts.py`: prompt loading and classification metadata
+- `src/qwen_image/inference/`: client/preprocessing/segmentation/orchestration
+- `src/qwen_image/api/`: request schemas and `/v1` routes
+- `src/qwen_image/ui/adapter.py`: UI adapter for Gradio mounting
+- `src/qwen_image/app.py`: unified app factory (API + mounted UI)
+- `src/qwen_image/server.py`: runtime entrypoint
+- `tests/`: API/UI/config regression tests
+
+Legacy entry scripts remain for compatibility:
+
+- `api_server.py`
+- `gui.py`
+
+Both now start the same unified server.
+
+## Run
+
+Start backend:
+
+```bash
+docker compose -f "docker/docker-compose vLLM Qwen3.5-9B.yaml" up -d --build
+```
+
+Start unified app (API + GUI):
+
+```bash
+uv run python api_server.py
+```
+
+or:
+
+```bash
+uv run python gui.py
+```
+
+Default endpoints:
+
+- API base: `http://localhost:7861/v1`
+- GUI: `http://localhost:7861/ui`
+
+## HTTP API
+
+### `GET /v1/prompts`
+
+```bash
+curl http://localhost:7861/v1/prompts
+```
+
+### `POST /v1/chat/completions`
+
+Prompt sources (priority):
+
+1. `prompt_text`
+2. `prompt_id` from `prompts.yaml`
+3. `prompt_name` from `prompts.yaml`
+4. user `messages[].content` text
+
+Video sources:
+
+- `video_path`
+- top-level `video_url`
+- `messages[].content` with `video_url`
+
+#### Example: minimal request using env defaults
+
+If you omit optional fields, server uses `request -> env -> hardcoded default` precedence.
+
+```bash
+curl -X POST http://localhost:7861/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt_name": "[Security] Shoplifting",
+    "video_path": "/home/onebonsai/Videos/shoplifiting/shoplifiting_2.mp4"
+  }'
+```
+
+#### Example: using stable prompt ID
+
+First list prompt IDs:
+
+```bash
+curl http://localhost:7861/v1/prompts
+```
+
+Then call by `prompt_id`:
+
+```bash
+curl -X POST http://localhost:7861/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt_id": "shoplifting_1",
+    "video_path": "/home/onebonsai/Videos/shoplifiting/shoplifiting_2.mp4"
+  }'
+```
+
+#### Example: explicit overrides in request
+
+```bash
+curl -X POST http://localhost:7861/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen3.5-9B",
+    "base_url": "http://localhost:8000/v1",
+    "prompt_text": "Classify and explain in two short sentences.",
+    "video_path": "/home/onebonsai/Videos/fire/fire_1.mp4",
+    "max_completion_tokens": 256,
+    "thinking": "off"
+  }'
+```
+
+#### Example: remote URL input (`video_url`)
+
+```bash
+curl -X POST http://localhost:7861/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt_name": "[Security] Shoplifting",
+    "video_url": "https://example.com/path/to/video.mp4"
+  }'
+```
+
+## Easy URL Testing
+
+If you want to quickly test `video_url` with your own clip:
+
+```bash
+cd /home/onebonsai/Videos/shoplifiting
+python3 -m http.server 9000
+```
+
+Then call:
+
+```bash
+curl -X POST http://localhost:7861/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt_name": "[Security] Shoplifting",
+    "video_url": "http://127.0.0.1:9000/shoplifiting_2.mp4"
+  }'
+```
+
+Note: private/loopback URL targets are blocked by default (`API_BLOCK_PRIVATE_URLS=1`).  
+For local URL testing in trusted environments only, set `API_BLOCK_PRIVATE_URLS=0`.
+
+## Classification Contract
+
+For classification prompts (`Burglary`, `Shoplifting`, `Warehouse`, `Car break in`, `Fire`, `Railroad tracks`):
+
+1. First non-empty line must be exactly one allowed label.
+2. Following lines should contain a short explanation.
+
+## Environment Variables
+
+See `.example.env` for the full list with explanations.
+
+Core server vars:
+
+- `APP_HOST` (default `0.0.0.0`)
+- `APP_PORT` (default `7861`)
+- `APP_UI_PATH` (default `/ui`)
+
+Security/access vars:
+
+- `API_AUTH_TOKEN` (if set, `/v1/*` requires `Authorization: Bearer <token>`)
+- `GUI_LOCAL_ONLY` (default `1`, restricts `/ui` to loopback clients)
+- `API_VIDEO_URL_TIMEOUT_SECONDS` (default `30`)
+- `API_VIDEO_URL_MAX_MB` (default `200`)
+- `API_BLOCK_PRIVATE_URLS` (default `1`)
+
+Prompt/config paths:
+
+- `PROMPTS_PATH` (default `./prompts.yaml`)
+
+vLLM request defaults (used when request omits fields):
+
+- `VLLM_BASE_URL`
+- `VLLM_MODEL`
+- `VLLM_API_KEY`
+- `VLLM_MAX_TOKENS`
+- `VLLM_MAX_COMPLETION_TOKENS`
+- `VLLM_THINKING_MODE`
+
+Video preprocessing/segmentation defaults:
+
+- `VLLM_PREPROCESS`
+- `VLLM_TARGET_RES`
+- `VLLM_VIDEO_FPS`
+- `VLLM_MAX_DURATION`
+- `VLLM_SEGMENT_OVERLAP`
+- `VLLM_MAX_CONCURRENT`
+- `VLLM_DO_SAMPLE_FRAMES`
+- `VLLM_SEGMENT_DISABLE_SERVER_SAMPLING`
+- `VLLM_AUTO_REENCODE_ON_ERROR`
+- `VLLM_REENCODE_FPS`
+- `VLLM_PRESENCE_PENALTY`
+
+GUI defaults:
+
+- `GUI_STREAM_OUTPUT`
+- `GUI_DEBUG`
+
+## Expose API, Keep GUI Local
+
+Recommended for LAN/public API testing:
+
+1. Keep `APP_HOST=0.0.0.0` to expose API.
+2. Keep `GUI_LOCAL_ONLY=1` so `/ui` is local-only.
+3. Set `API_AUTH_TOKEN=<strong-random-token>`.
+4. Call API with:
+
+```bash
+curl http://<server-ip>:7861/v1/prompts \
+  -H "Authorization: Bearer <strong-random-token>"
+```

@@ -16,3 +16,8 @@ visual_experimentation_app/results/runs/run_*
 visual_experimentation_app/results/run_history.jsonl
 .github/copilot-instructions.md
 visual_experimentation_app/.env.example
+Qwen3.5-main/.vscode/settings.json
+Qwen3.5-main/.github/copilot-instructions.md
+visual_experimentation_app/results/benchmark_history.jsonl
+bench_*.json
+bench_*.csv

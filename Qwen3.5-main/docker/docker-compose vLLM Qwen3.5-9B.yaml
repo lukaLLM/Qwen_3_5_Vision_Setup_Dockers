@@ -1,0 +1,85 @@
+name: vllm_qwen3.5-9B
+
+networks:
+  server:
+    # Isolated bridge network for GUI/client <-> vLLM container traffic.
+    driver: bridge
+
+services:
+  vllm:
+    # Nightly CUDA 13 image with latest multimodal fixes.
+    image: vllm/vllm-openai:cu130-nightly # Alternative stable tag: vllm/vllm-openai:latest
+    container_name: vLLM_Qwen3.5-9B
+    # Keeps access flexible for GPU/runtime internals in this setup.
+    privileged: true
+    # Loads HF token and runtime knobs from project .env.
+    env_file:
+      - ../.env
+    networks:
+      - server
+    # Expose OpenAI-compatible vLLM API on localhost:8000.
+    ports:
+      - "8000:8000"
+    # Shared memory helps multimodal processors and avoids /dev/shm bottlenecks.
+    ipc: host
+    # Higher ulimits prevent file/socket and memory lock issues under load.
+    ulimits:
+      memlock: -1
+      stack: 67108864
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    # Use all visible NVIDIA GPUs.
+    gpus: all
+    environment:
+      # Hugging Face cache location inside container.
+      - HF_HOME=/data/hf
+      - HF_HUB_CACHE=/data/hf/hub
+    volumes:
+      # Persist model/tokenizer cache on host.
+      - ${HOME}/.cache/huggingface:/data/hf
+      # Hide CUDA compat override from container image to avoid mismatch issues only for Blackwell
+      - /dev/null:/etc/ld.so.conf.d/00-cuda-compat.conf
+    command:
+      # Model repo served by this instance.
+      - Qwen/Qwen3.5-9B
+      # Attention backend for standard attention (MHA/MQA/GQA).
+      # Override from shell/.env: VLLM_ATTENTION_BACKEND=FLASHINFER|FLASH_ATTN|TRITON_ATTN|FLEX_ATTENTION
+      - --attention-backend
+      - ${VLLM_ATTENTION_BACKEND:-FLASH_ATTN}
+      # vLLM optimization level (O3 = aggressive).
+      - -O${VLLM_OPT_LEVEL:-3}
+      # Required for repositories with custom HF code.
+      - --trust-remote-code
+      # Concurrent requests scheduled by engine. Keep 1 for stability; raise to 2 later.
+      - --max-num-seqs=1
+      # Fraction of GPU memory reserved for model + KV cache. I use this for 32 GB VRAM
+      - --gpu_memory_utilization
+      - "0.7"
+      # Cap context length to reduce KV allocation pressure and startup overhead.
+      - --max-model-len
+      - "32768"
+      # Data-parallel mode for vision encoder in multimodal workloads.
+      - --mm-encoder-tp-mode
+      - data
+      # Share multimodal processor cache via shared memory for faster reuse.
+      - --mm-processor-cache-type
+      - shm
+      # Allows dynamic frame count handling for video inputs.
+      - --media-io-kwargs
+      - '{"video":{"num_frames":-1}}'
+      # Server-side frame sampling defaults (fps-based).
+      - --mm-processor-kwargs
+      - '{"do_sample_frames":true,"fps":1.0}'
+      # Enables Qwen3 reasoning parser support.
+      - --reasoning-parser
+      - qwen3
+      # Reuse prompt prefixes across similar requests.
+      - --enable-prefix-caching
+      # Enables automatic tool-call mode (OpenAI-compatible tools path).
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - qwen3_coder
+      # Hard cap multimodal items per prompt.
+      - --limit-mm-per-prompt
+      - '{"image":1,"video":1}'

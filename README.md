@@ -90,6 +90,65 @@ docker compose -f "Inference_Single/docker-compose vLLM Qwen3.5-27B-GPTQ-Int4.ya
 docker compose -f "Inference_Single/docker-compose vLLM Qwen3.5-27B-FP8.yaml" up -d
 ```
 
+### Test attention backend + aggressive optimization (`-O3`)
+
+All vLLM compose profiles now accept:
+
+- `VLLM_ATTENTION_BACKEND` (`FLASH_ATTN`, `FLASHINFER`, `TRITON_ATTN`, `FLEX_ATTENTION`)
+- `VLLM_OPT_LEVEL` (`3` = aggressive; current vLLM docs note it is presently equivalent to `-O2`)
+
+Run with temporary shell overrides (no file edits needed):
+
+```bash
+VLLM_ATTENTION_BACKEND=FLASHINFER VLLM_OPT_LEVEL=3 \
+docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" up -d --force-recreate
+```
+
+Check which backend was actually selected:
+
+```bash
+docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" logs vllm | rg "Using backend|Using FLASH_ATTN|FLASHINFER|TRITON_ATTN|FLEX_ATTENTION"
+```
+
+Quick sweep example:
+
+```bash
+for b in FLASH_ATTN FLASHINFER TRITON_ATTN FLEX_ATTENTION; do
+  echo "=== backend: $b ==="
+  VLLM_ATTENTION_BACKEND="$b" VLLM_OPT_LEVEL=3 \
+  docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" up -d --force-recreate
+  sleep 8
+  docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" logs --tail=120 vllm | rg "Using backend|Error|exception" || true
+done
+```
+
+### Chunked Prefill Toggle (Explicit ON/OFF)
+
+Chunked prefill is wired as an explicit compose flag so behavior is unambiguous.
+
+- Default (from `.env.example`): `VLLM_CHUNKED_PREFILL_FLAG=--no-enable-chunked-prefill`
+- Opt in: `VLLM_CHUNKED_PREFILL_FLAG=--enable-chunked-prefill`
+
+Example:
+
+```bash
+VLLM_CHUNKED_PREFILL_FLAG=--enable-chunked-prefill \
+docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" up -d --force-recreate
+```
+
+Validate what compose will pass:
+
+```bash
+VLLM_CHUNKED_PREFILL_FLAG=--enable-chunked-prefill \
+docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" config | rg "chunked-prefill"
+```
+
+Check runtime logs:
+
+```bash
+docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" logs vllm | rg -i "chunked|prefill"
+```
+
 Stop:
 
 ```bash

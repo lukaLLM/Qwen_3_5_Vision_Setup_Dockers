@@ -107,6 +107,44 @@ Use these levers to improve video generation speed (measure each change in isola
 5. Increase engine throughput knobs (`--max-num-seqs`) carefully while watching OOM risk.
 6. Keep cache enabled for production latency; disable cache for fair comparisons.
 
+## Benchmark Semantics (Chunk-First)
+
+Benchmark parallelism is chunk-first, not duplicate full-run fanout:
+
+- `Chunk Parallel Requests to Test (CSV)` means how many video chunks are sent to vLLM concurrently.
+- One benchmark repeat is one logical run (one final aggregated output), even when chunk parallel is > 1.
+- If segmentation is off (or only one chunk is produced), chunk parallel has no effect.
+
+Optional compare mode:
+
+- `Include Non-Segmented Baseline` adds one non-segmented baseline per height.
+- `segmented`: sweeps all chunk-parallel values with current segment settings.
+- `non_segmented`: forces `segment_max_duration_s=0` and `segment_overlap_s=0`.
+
+## Benchmark Prompt (Low-Variance)
+
+For stable perf comparisons, use the one-word classifier prompt:
+
+- UI preset: `Video Type (One Word)`
+- Script flag: `--one-word-video-type-prompt`
+
+Example:
+
+```bash
+python3 scripts/mm_lab_video_perf_suite.py \
+  --video /path/to/test.mp4 \
+  --one-word-video-type-prompt
+```
+
+### Graph Guide
+
+- Graph 1: Latency vs Chunk Parallel Requests.
+- Graph 2: Throughput vs Chunk Parallel Requests.
+- Graph 3: Full Video Completion Time (ms) by config and segmentation mode.
+- Graph 4: Stacked time split (`preprocess %` + `request %`) by combo.
+
+Use native chart fullscreen from each graph toolbar. Hover tooltips stay enabled in fullscreen.
+
 ## Video Bug Note
 
 As of **March 14, 2026**, vLLM PR `#33956` remains open:

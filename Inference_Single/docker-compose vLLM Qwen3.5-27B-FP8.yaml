@@ -31,6 +31,8 @@ services:
       - /dev/null:/etc/ld.so.conf.d/00-cuda-compat.conf
     command:
       - Qwen/Qwen3.5-27B-FP8
+      - --attention-backend=${VLLM_ATTENTION_BACKEND:-FLASH_ATTN}
+      - -O${VLLM_OPT_LEVEL:-3}
       - --trust-remote-code
       - --gpu_memory_utilization
       - "0.8"
