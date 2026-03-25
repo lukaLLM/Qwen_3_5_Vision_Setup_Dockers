@@ -348,29 +348,6 @@ def _extract_segment(source: Path, *, start_s: float, end_s: float) -> Path:
     output_path = _mktemp_path(prefix="mm_lab_segment_", suffix=".mp4")
     duration = max(end_s - start_s, 0.05)
 
-    copy_cmd = [
-        "ffmpeg",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-y",
-        "-ss",
-        f"{start_s:.3f}",
-        "-t",
-        f"{duration:.3f}",
-        "-i",
-        str(source),
-        "-map",
-        "0:v:0",
-        "-an",
-        "-c",
-        "copy",
-        str(output_path),
-    ]
-    copy_result = subprocess.run(copy_cmd, capture_output=True, text=True, check=False)
-    if copy_result.returncode == 0:
-        return output_path
-
     transcode_cmd = [
         "ffmpeg",
         "-hide_banner",

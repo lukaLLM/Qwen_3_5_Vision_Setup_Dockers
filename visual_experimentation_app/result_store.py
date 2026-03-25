@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from visual_experimentation_app.benchmark_graphs import save_graph_csv_artifacts
 from visual_experimentation_app.config import get_settings
 from visual_experimentation_app.schemas import BenchmarkResult, RunHistoryItem, RunResult
 
@@ -110,6 +111,7 @@ def save_benchmark_result(result: BenchmarkResult) -> dict[str, str]:
         "target_height",
         "request_concurrency",
         "segment_workers",
+        "segmentation_mode",
         "status",
         "preprocess_ms",
         "request_ms",
@@ -117,6 +119,13 @@ def save_benchmark_result(result: BenchmarkResult) -> dict[str, str]:
         "ttft_ms",
         "output_hash",
         "output_chars",
+        "prompt_tokens",
+        "output_tokens",
+        "total_tokens",
+        "preprocess_pct",
+        "request_pct",
+        "ms_per_output_token",
+        "ms_per_100_output_tokens",
         "error",
     ]
     with benchmark_csv.open("w", newline="", encoding="utf-8") as handle:
@@ -124,6 +133,11 @@ def save_benchmark_result(result: BenchmarkResult) -> dict[str, str]:
         writer.writeheader()
         for record in result.records:
             writer.writerow(record.model_dump())
+
+    graph_paths = save_graph_csv_artifacts(
+        result=result,
+        benchmark_dir=_benchmarks_dir(),
+    )
 
     with _benchmark_history_path().open("a", encoding="utf-8") as handle:
         handle.write(
@@ -135,9 +149,10 @@ def save_benchmark_result(result: BenchmarkResult) -> dict[str, str]:
                     "record_count": len(result.records),
                     "json_path": str(benchmark_json),
                     "csv_path": str(benchmark_csv),
+                    "graph_paths": graph_paths,
                 }
             )
         )
         handle.write("\n")
 
-    return {"json": str(benchmark_json), "csv": str(benchmark_csv)}
+    return {"json": str(benchmark_json), "csv": str(benchmark_csv)} | graph_paths

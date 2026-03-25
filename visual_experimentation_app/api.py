@@ -27,7 +27,11 @@ from visual_experimentation_app.schemas import (
     RunResult,
     RunTiming,
 )
-from visual_experimentation_app.vllm_client import execute_run
+from visual_experimentation_app.vllm_client import (
+    build_execution_error_details,
+    execute_run,
+    summarize_execution_error,
+)
 
 router = APIRouter()
 
@@ -77,6 +81,7 @@ def run_once(request: RunRequest) -> RunResult:
             media_metadata=execution.media_metadata,
         )
     except Exception as exc:  # noqa: BLE001
+        error_details = build_execution_error_details(exc)
         total_ms = (perf_counter() - started) * 1000.0
         result = RunResult(
             run_id=run_id,
@@ -84,14 +89,14 @@ def run_once(request: RunRequest) -> RunResult:
             created_at=created_at,
             request=request,
             output_text="",
-            error=str(exc),
+            error=summarize_execution_error(exc),
             timings=RunTiming(
                 preprocess_ms=0.0,
                 request_ms=0.0,
                 total_ms=total_ms,
                 ttft_ms=None,
             ),
-            effective_params={},
+            effective_params={"error_details": error_details},
             media_metadata={},
         )
 

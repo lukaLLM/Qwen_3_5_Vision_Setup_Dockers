@@ -11,6 +11,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+DEFAULT_BENCHMARK_PROMPT = "Summarize key events and important visual details."
+ONE_WORD_VIDEO_TYPE_PROMPT = (
+    "Classify the primary video type.\n\n"
+    "Return exactly one lowercase word.\n"
+    "No punctuation. No explanation. No extra tokens.\n\n"
+    "Allowed words:\n"
+    "tutorial, documentary, interview, lecture, gameplay, vlog, ad, news, "
+    "sports, animation, movie, other"
+)
+
 
 def _json_post(url: str, payload: dict[str, Any]) -> dict[str, Any]:
     body = json.dumps(payload).encode("utf-8")
@@ -126,7 +136,12 @@ def main() -> int:
     parser.add_argument("--video", required=True, help="Path to local test video.")
     parser.add_argument("--image", action="append", default=[], help="Optional image path(s).")
     parser.add_argument("--model", default="Qwen/Qwen3.5-4B", help="Model id.")
-    parser.add_argument("--prompt", default="Summarize key events and important visual details.")
+    parser.add_argument("--prompt", default=DEFAULT_BENCHMARK_PROMPT)
+    parser.add_argument(
+        "--one-word-video-type-prompt",
+        action="store_true",
+        help="Use a short one-word video type classifier prompt for benchmark stability.",
+    )
     parser.add_argument("--repeats", type=int, default=3, help="Repeats per benchmark combo.")
     parser.add_argument("--warmup", type=int, default=1, help="Warmup runs per combo.")
     parser.add_argument("--timeout-seconds", type=float, default=600.0, help="Request timeout.")
@@ -169,11 +184,15 @@ def main() -> int:
                     set(scenario["request_concurrency"] + extra)
                 )
 
+    prompt_text = (
+        ONE_WORD_VIDEO_TYPE_PROMPT if args.one_word_video_type_prompt else args.prompt
+    )
+
     report_rows: list[dict[str, Any]] = []
 
     for scenario in scenarios:
         base_run = {
-            "prompt": args.prompt,
+            "prompt": prompt_text,
             "text_input": None,
             "image_paths": args.image,
             "video_path": args.video,
@@ -187,7 +206,7 @@ def main() -> int:
             "top_k": 20,
             "presence_penalty": 1.5,
             "frequency_penalty": 0.0,
-            "thinking_mode": "auto",
+            "thinking_mode": "off",
             "show_reasoning": False,
             "measure_ttft": True,
             "preprocess_images": True,

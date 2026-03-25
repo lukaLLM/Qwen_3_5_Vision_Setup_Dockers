@@ -66,6 +66,9 @@ class MmLabApiTest(unittest.TestCase):
                 ttft_ms=0.5,
                 effective_params={"model": "Qwen/Qwen3.5-4B"},
                 media_metadata={},
+                prompt_tokens=10,
+                output_tokens=20,
+                total_tokens=30,
             ),
         ):
             response = self.client.post("/api/run", json={"prompt": "hello"})

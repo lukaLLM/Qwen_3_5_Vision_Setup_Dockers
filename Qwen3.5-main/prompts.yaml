@@ -1,0 +1,115 @@
+- id: overview_1
+  name: '[Overview] Describe the action in this clip'
+  text: Give a concise play-by-play description of the clip, including build-up, key event, and immediate outcome.
+- id: refereeing_1
+  name: '[Refereeing] Was a foul committed?'
+  text: Analyze whether a foul appears to be committed. Explain the contact, timing, and likely referee decision.
+- id: scoring_1
+  name: '[Scoring] Who scored and how?'
+  text: Identify whether a goal/basket is scored, who likely scored, and describe the finishing action.
+- id: tactics_1
+  name: '[Tactics] Break down the attacking pattern'
+  text: Describe the attacking sequence with focus on spacing, passing, off-ball movement, and final chance creation.
+- id: defense_1
+  name: '[Defense] Evaluate the defensive mistakes'
+  text: Explain the defensive positioning and errors that led to danger, and suggest one better defensive alternative.
+- id: discipline_1
+  name: '[Discipline] Should this be a red/yellow card?'
+  text: Assess the challenge severity and intent, then judge whether no card, yellow, or red is most appropriate.
+- id: timeline_1
+  name: '[Timeline] Key moments with timestamps'
+  text: List the key moments in chronological order with approximate timestamps and one-line descriptions.
+- id: commentary_1
+  name: '[Commentary] Write a commentator-style summary'
+  text: Write an energetic but factual commentator-style summary of this clip in 4-6 sentences.
+- id: burglary_1
+  name: '[Security] Burglary'
+  text: |-
+    Classify this scene using exactly one label:
+    - burglary
+    - suspicious
+    - normal
+
+    Rules:
+    - Use "burglary" when theft, attempted theft, forced entry, or unlawful intrusion is clearly visible.
+    - Use "suspicious" when behavior is concerning (casing, tampering, prowling, hiding identity) but crime is not fully proven.
+    - Use "normal" when no suspicious or criminal behavior is visible.
+
+    Output format:
+    - First non-empty line: exactly one label (burglary | suspicious | normal)
+    - Next line(s): exactly two short sentences describing why behind the label.
+- id: warehouse_1
+  name: '[Safety] Warehouse'
+  text: |-
+    Classify this scene using exactly one label:
+    - helmet_off
+    - suspicious
+    - normal
+
+    Rules:
+    - Use "helmet_off" if at least one visible worker appears without a helmet.
+    - Use "suspicious" if helmet visibility is ambiguous or there is a possible safety concern not fully clear.
+    - Use "normal" if all visible workers appear compliant and no concern is visible.
+
+    Output format:
+    - First non-empty line: exactly one label (helmet_off | suspicious | normal)
+    - Next line(s): exactly two short sentences describing why behind the label.
+- id: shoplifting_1
+  name: '[Security] Shoplifting'
+  text: |-
+    Classify this scene using exactly one label:
+    - shoplifting
+    - suspicious
+    - normal
+
+    Rules:
+    - Use "shoplifting" when concealment or theft is clearly visible (for example item disappearing under clothes).
+    - Watch closely the hands if the product suddenly disappears under clothes or bag.
+    - Use "suspicious" for concerning behavior that does not clearly prove theft.
+    - Use "normal" when no suspicious or theft behavior is visible.
+
+    Output format:
+    - First non-empty line: exactly one label (shoplifting | suspicious | normal)
+    - Next line(s): exactly two short sentences describing why behind the label.
+- id: car_break_in_1
+  name: '[Security] Car break in'
+  text: |-
+    Classify this scene using exactly one label:
+    - car_break_in
+    - no_break_in
+
+    Rules:
+    - Use "car_break_in" only when forced entry, unlawful access, or theft from the vehicle is clearly visible.
+    - Use "no_break_in" when forced or unlawful access is not clearly visible.
+
+    Output format:
+    - First non-empty line: exactly one label (car_break_in | no_break_in)
+    - Next line(s): exactly two short sentences describing why behind the label.
+- id: fire_1
+  name: '[Safety] Fire'
+  text: |-
+    Classify this scene using exactly one label:
+    - fire
+    - no_fire
+
+    Rules:
+    - Use "fire" when visible flames are present.
+    - Use "no_fire" when no flames are visible.
+
+    Output format:
+    - First non-empty line: exactly one label (fire | no_fire)
+    - Next line(s): exactly two short sentences describing why behind the label.
+- id: railroad_tracks_1
+  name: '[Safety] Railroad tracks'
+  text: |-
+    Classify this scene using exactly one label:
+    - on_tracks
+    - not_on_tracks
+
+    Rules:
+    - Use "on_tracks" when any person or object is on the railroad tracks.
+    - Use "not_on_tracks" when tracks are clear.
+
+    Output format:
+    - First non-empty line: exactly one label (on_tracks | not_on_tracks)
+    - Next line(s): exactly two short sentences describing why behind the label.

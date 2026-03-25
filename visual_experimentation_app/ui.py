@@ -8,7 +8,9 @@ from typing import Any, Literal, cast
 from uuid import uuid4
 
 import gradio as gr
+import pandas as pd
 
+from visual_experimentation_app.benchmark_graphs import build_graph_frames
 from visual_experimentation_app.benchmark_runner import run_benchmark
 from visual_experimentation_app.config import get_settings
 from visual_experimentation_app.payload_builder import parse_json_object
@@ -25,11 +27,41 @@ from visual_experimentation_app.schemas import (
     RunResult,
     RunTiming,
 )
-from visual_experimentation_app.vllm_client import execute_run
+from visual_experimentation_app.ui_presets import (
+    DEFAULT_CUSTOM_PROMPT,
+    DEFAULT_TAG_CATEGORIES,
+    PROMPT_MODE_CHOICES,
+    PROMPT_MODE_CLASSIFIER,
+    PROMPT_MODE_CUSTOM,
+    PROMPT_MODE_TAGGING,
+    SEGMENTATION_PROFILE_CHOICES,
+    SEGMENTATION_PROFILE_OFF,
+    build_prompt_for_mode,
+    segmentation_values_for_profile,
+)
+from visual_experimentation_app.vllm_client import (
+    build_execution_error_details,
+    execute_run,
+    summarize_execution_error,
+)
 
 APP_THEME = gr.themes.Default()
 
-CUSTOM_CSS = ""
+CUSTOM_CSS = """
+#single-run-status h1,
+#single-run-status h2,
+#single-run-status h3 {
+  font-size: 1.35rem !important;
+  line-height: 1.3 !important;
+  margin: 0.25rem 0 0.35rem 0 !important;
+}
+
+#single-run-status p,
+#single-run-status li {
+  font-size: 1.05rem !important;
+  line-height: 1.5 !important;
+}
+"""
 
 
 def ui_theme() -> object:
@@ -109,6 +141,44 @@ def _csv_to_str_list(raw_value: Any) -> list[str]:
     if not cleaned.strip():
         return []
     return [item.strip() for item in cleaned.split(",") if item.strip()]
+
+
+def _apply_prompt_mode(mode: str, current_prompt: str, tag_categories_csv: str) -> str:
+    """Return prompt text based on the selected UI preset mode."""
+    return build_prompt_for_mode(
+        mode=_clean_text(mode).strip(),
+        current_prompt=_clean_text(current_prompt),
+        tag_categories_csv=_clean_text(tag_categories_csv),
+    )
+
+
+def _refresh_prompt_for_tagging(
+    mode: str,
+    current_prompt: str,
+    tag_categories_csv: str,
+) -> str:
+    """Refresh prompt when category-driven preset modes are active."""
+    clean_mode = _clean_text(mode).strip()
+    if clean_mode not in {PROMPT_MODE_TAGGING, PROMPT_MODE_CLASSIFIER}:
+        return _clean_text(current_prompt)
+    return build_prompt_for_mode(
+        mode=clean_mode,
+        current_prompt=_clean_text(current_prompt),
+        tag_categories_csv=_clean_text(tag_categories_csv),
+    )
+
+
+def _apply_segmentation_profile(
+    profile: str,
+    current_duration: float,
+    current_overlap: float,
+) -> tuple[float, float]:
+    """Apply segmentation defaults from the selected profile."""
+    return segmentation_values_for_profile(
+        profile=_clean_text(profile).strip(),
+        current_duration=float(current_duration),
+        current_overlap=float(current_overlap),
+    )
 
 
 def _build_run_request(
@@ -239,20 +309,21 @@ def _execute_and_persist(run_request: RunRequest) -> RunResult:
             media_metadata=execution.media_metadata,
         )
     except Exception as exc:  # noqa: BLE001
+        error_details = build_execution_error_details(exc)
         result = RunResult(
             run_id=run_id,
             status="error",
             created_at=created_at,
             request=run_request,
             output_text="",
-            error=str(exc),
+            error=summarize_execution_error(exc),
             timings=RunTiming(
                 preprocess_ms=0.0,
                 request_ms=0.0,
                 total_ms=(perf_counter() - started) * 1000.0,
                 ttft_ms=None,
             ),
-            effective_params={},
+            effective_params={"error_details": error_details},
             media_metadata={},
         )
 
@@ -371,23 +442,102 @@ def _run_single(*args: Any) -> tuple[str, dict[str, Any], str, str]:
             extra_body_json=args[31],
             extra_headers_json=args[32],
         )
+        chunk_parallel_requests = max(1, int(args[33]))
     except Exception as exc:  # noqa: BLE001
         return f"**Input error:** {exc}", {}, "_Invalid request._", "Input validation failed."
 
+    request.segment_workers = chunk_parallel_requests
     result = _execute_and_persist(request)
     mode_text = "model-defaults mode" if result.request.use_model_defaults else "explicit mode"
+    segment_count = int(result.effective_params.get("segment_count") or 0)
+    segment_workers = int(result.effective_params.get("segment_workers") or request.segment_workers)
+    segment_note = (
+        "- Note: chunk parallel requests had no effect (segmentation OFF or only 1 chunk).\n"
+        if segment_count <= 1 and chunk_parallel_requests > 1
+        else ""
+    )
     status_line = (
-        f"Run `{result.run_id}` completed in {result.timings.total_ms:.1f} ms ({mode_text}). "
-        "See `Run Result JSON -> effective_params` for exact sent/omitted parameters."
+        (
+            f"### Completed Time: `{result.timings.total_ms:.1f} ms`\n"
+            f"- Run ID: `{result.run_id}`\n"
+            f"- Mode: `{mode_text}`\n"
+            f"- Chunk parallel requests: `{chunk_parallel_requests}`\n"
+            f"- Segments: `{segment_count}` (effective chunk workers: `{segment_workers}`)\n"
+            f"{segment_note}"
+            "- See `Run Result JSON -> effective_params` for exact sent/omitted parameters."
+        )
         if result.status == "ok"
-        else f"Run `{result.run_id}` failed: {result.error}"
+        else f"### Run Failed\n- Run ID: `{result.run_id}`\n- Error: {result.error}"
     )
     output_markdown = result.output_text.strip() or "_No output text returned._"
     effective_request_md = _build_effective_request_markdown(result)
     return output_markdown, result.model_dump(), effective_request_md, status_line
 
 
-def _run_benchmark(*args: Any) -> tuple[str, dict[str, Any], str]:
+def _empty_benchmark_graph_frames(
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    return (
+        pd.DataFrame(
+            columns=[
+                "request_concurrency",
+                "target_height",
+                "segment_workers",
+                "segmentation_mode",
+                "resolution_label",
+                "series_label",
+                "combo_label",
+                "latency_ms",
+            ]
+        ),
+        pd.DataFrame(
+            columns=[
+                "request_concurrency",
+                "target_height",
+                "segment_workers",
+                "segmentation_mode",
+                "resolution_label",
+                "series_label",
+                "combo_label",
+                "throughput_tokens_per_sec",
+            ]
+        ),
+        pd.DataFrame(
+            columns=[
+                "config_label",
+                "combo_label",
+                "target_height",
+                "segment_workers",
+                "segmentation_mode",
+                "request_concurrency",
+                "resolution_label",
+                "completion_time_ms",
+            ]
+        ),
+        pd.DataFrame(
+            columns=[
+                "combo_label",
+                "target_height",
+                "segment_workers",
+                "segmentation_mode",
+                "request_concurrency",
+                "stage",
+                "pct_value",
+            ]
+        ),
+    )
+
+
+def _run_benchmark(
+    *args: Any,
+) -> tuple[
+    str,
+    dict[str, Any],
+    str,
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+]:
     try:
         base_run = _build_run_request(
             prompt=args[0],
@@ -428,14 +578,28 @@ def _run_benchmark(*args: Any) -> tuple[str, dict[str, Any], str]:
             base_run=base_run,
             repeats=int(args[33]),
             warmup_runs=int(args[34]),
-            resolution_heights=_csv_to_int_list(args[35], field_name="Resolution heights"),
-            request_concurrency=_csv_to_int_list(args[36], field_name="Request concurrency"),
-            segment_workers=_csv_to_int_list(args[37], field_name="Segment workers"),
-            continue_on_error=bool(args[38]),
-            label=args[39].strip() or None,
+            resolution_heights=_csv_to_int_list(
+                args[35],
+                field_name="Target Video Heights to Test",
+            ),
+            request_concurrency=_csv_to_int_list(
+                args[36],
+                field_name="Chunk Parallel Requests to Test",
+            ),
+            segment_workers=[base_run.segment_workers],
+            wait_between_combos_s=float(args[37]),
+            include_non_segmented_baseline=bool(args[38]),
+            continue_on_error=bool(args[39]),
+            label=args[40].strip() or None,
         )
     except Exception as exc:  # noqa: BLE001
-        return f"**Input error:** {exc}", {}, "Benchmark input validation failed."
+        empty_graphs = _empty_benchmark_graph_frames()
+        return (
+            f"**Input error:** {exc}",
+            {},
+            "Benchmark input validation failed.",
+            *empty_graphs,
+        )
 
     benchmark_id = f"bench_{uuid4().hex}"
     created_at = _utc_now_iso()
@@ -454,10 +618,17 @@ def _run_benchmark(*args: Any) -> tuple[str, dict[str, Any], str]:
         )
         paths = save_benchmark_result(result)
         result.artifact_paths = paths | {"error": str(exc)}
-        return f"**Benchmark failed:** {exc}", result.model_dump(), str(result.artifact_paths)
+        empty_graphs = _empty_benchmark_graph_frames()
+        return (
+            f"**Benchmark failed:** {exc}",
+            result.model_dump(),
+            str(result.artifact_paths),
+            *empty_graphs,
+        )
 
     paths = save_benchmark_result(result)
     result.artifact_paths = paths
+    graph_frames = build_graph_frames(result)
 
     success_count = sum(1 for item in result.records if item.status == "ok")
     summary = (
@@ -466,7 +637,15 @@ def _run_benchmark(*args: Any) -> tuple[str, dict[str, Any], str]:
         f"- Successful: {success_count}\n"
         f"- Aggregates: {len(result.aggregates)}"
     )
-    return summary, result.model_dump(), str(paths)
+    return (
+        summary,
+        result.model_dump(),
+        str(paths),
+        graph_frames["latency_by_concurrency"],
+        graph_frames["throughput_by_concurrency"],
+        graph_frames["completion_time_ms"],
+        graph_frames["time_split_stacked"],
+    )
 
 
 def _refresh_history() -> tuple[list[list[Any]], dict[str, Any]]:
@@ -516,10 +695,20 @@ def build_ui_blocks() -> gr.Blocks:
             )
             with gr.Row(equal_height=True):
                 with gr.Column(scale=5, elem_classes=["panel"]):
+                    prompt_mode = gr.Radio(
+                        choices=PROMPT_MODE_CHOICES,
+                        label="Prompt Mode",
+                        value=PROMPT_MODE_CUSTOM,
+                    )
+                    tag_categories = gr.Textbox(
+                        label="Tag Categories (CSV)",
+                        value=DEFAULT_TAG_CATEGORIES,
+                        info="Used by Tagging and Classifier presets.",
+                    )
                     prompt = gr.Textbox(
                         label="Prompt",
                         lines=5,
-                        value="Describe what is happening.",
+                        value=DEFAULT_CUSTOM_PROMPT,
                     )
                     text_input = gr.Textbox(label="Additional Text Input (optional)", lines=3)
                     image_upload = gr.File(label="Images (multiple)", file_count="multiple")
@@ -532,7 +721,11 @@ def build_ui_blocks() -> gr.Blocks:
                     video_upload = gr.File(label="Videos (up to 2)", file_count="multiple")
                     video_preview = gr.Video(label="Video Preview")
                     run_button = gr.Button("Run", variant="primary")
-                    run_status = gr.Markdown("Idle.", elem_classes=["readable-output"])
+                    run_status = gr.Markdown(
+                        "Idle.",
+                        elem_id="single-run-status",
+                        elem_classes=["readable-output"],
+                    )
                 with gr.Column(scale=7, elem_classes=["panel"]):
                     with gr.Accordion("Connection + Generation", open=True):
                         base_url = gr.Textbox(label="vLLM Base URL", value=settings.base_url)
@@ -548,6 +741,17 @@ def build_ui_blocks() -> gr.Blocks:
                             step=5,
                             value=settings.timeout_seconds,
                             label="Request Timeout (seconds)",
+                        )
+                        single_run_request_concurrency = gr.Slider(
+                            minimum=1,
+                            maximum=16,
+                            step=1,
+                            value=1,
+                            label="Chunk Parallel Requests",
+                            info=(
+                                "Number of chunks sent to vLLM at once "
+                                "(when segmentation yields 2+ chunks)."
+                            ),
                         )
                         use_model_defaults = gr.Checkbox(
                             label="Use model/server defaults (send minimal generation params)",
@@ -599,7 +803,7 @@ def build_ui_blocks() -> gr.Blocks:
                         thinking_mode = gr.Radio(
                             choices=["auto", "on", "off"],
                             label="thinking_mode",
-                            value="auto",
+                            value="off",
                         )
                         show_reasoning = gr.Checkbox(label="Show reasoning output", value=False)
                         measure_ttft = gr.Checkbox(
@@ -635,26 +839,36 @@ def build_ui_blocks() -> gr.Blocks:
                             value=settings.default_video_fps,
                             label="Video sampling fps when safe mode is OFF",
                         )
+                        segmentation_profile = gr.Radio(
+                            choices=SEGMENTATION_PROFILE_CHOICES,
+                            label="Segmentation Profile",
+                            value=SEGMENTATION_PROFILE_OFF,
+                        )
+                        gr.Markdown(
+                            (
+                                "Segment clips are re-encoded (`libx264`/`yuv420p`) for "
+                                "processor metadata stability on long videos."
+                            ),
+                            elem_classes=["tab-note"],
+                        )
                         segment_max_duration_s = gr.Slider(
                             minimum=0.0,
-                            maximum=180.0,
+                            maximum=3600.0,
                             step=1.0,
                             value=0.0,
                             label="Segment max duration (seconds, 0 disables segmentation)",
                         )
                         segment_overlap_s = gr.Slider(
                             minimum=0.0,
-                            maximum=30.0,
+                            maximum=300.0,
                             step=0.5,
                             value=0.0,
                             label="Segment overlap (seconds)",
                         )
-                        segment_workers = gr.Slider(
-                            minimum=1,
-                            maximum=16,
-                            step=1,
+                        segment_workers = gr.Number(
                             value=1,
-                            label="Segment workers",
+                            precision=0,
+                            visible=False,
                         )
 
                     with gr.Accordion("Advanced JSON", open=False):
@@ -702,12 +916,43 @@ def build_ui_blocks() -> gr.Blocks:
                 "Sweep key variables to compare throughput, latency, and aggregate behavior.",
                 elem_classes=["tab-note"],
             )
+            gr.Markdown(
+                (
+                    "Benchmark reuses current Single Run settings as the base request "
+                    "(including segmentation chunk seconds + overlap). "
+                    "This tab sweeps target height and chunk parallel requests."
+                ),
+                elem_classes=["tab-note"],
+            )
             benchmark_label = gr.Textbox(label="Benchmark label (optional)")
             repeats = gr.Slider(minimum=1, maximum=20, step=1, value=3, label="Repeats per combo")
             warmup_runs = gr.Slider(minimum=0, maximum=10, step=1, value=0, label="Warmup runs")
-            resolution_heights = gr.Textbox(label="Resolution heights CSV", value="360,480,720")
-            request_concurrency = gr.Textbox(label="Request concurrency CSV", value="1,2")
-            segment_workers_sweep = gr.Textbox(label="Segment workers CSV", value="1,2")
+            resolution_heights = gr.Textbox(
+                label="Target Video Heights to Test (px, CSV)",
+                value="360,480,720",
+                info="e.g. 360,480,720",
+            )
+            request_concurrency = gr.Textbox(
+                label="Chunk Parallel Requests to Test (CSV)",
+                value="1,2",
+                info="Number of chunks sent to vLLM at once (e.g. 1,2,4).",
+            )
+            wait_between_combos_s = gr.Slider(
+                minimum=0.0,
+                maximum=60.0,
+                step=0.5,
+                value=0.0,
+                label="Wait Between Benchmark Combos (seconds)",
+                info="Pause after each combo group before starting the next one.",
+            )
+            include_non_segmented_baseline = gr.Checkbox(
+                label="Include Non-Segmented Baseline",
+                value=True,
+                info=(
+                    "Run one non-segmented baseline per height "
+                    "(chunk-parallel sweep applies to segmented mode)."
+                ),
+            )
             continue_on_error = gr.Checkbox(label="Continue on run errors", value=True)
             benchmark_button = gr.Button("Run Benchmark", variant="primary")
             benchmark_summary = gr.Markdown(
@@ -722,6 +967,86 @@ def build_ui_blocks() -> gr.Blocks:
                 "Artifacts will be listed here.",
                 elem_classes=["readable-output"],
             )
+            with gr.Row(equal_height=True):
+                latency_plot = gr.LinePlot(
+                    x="request_concurrency",
+                    y="latency_ms",
+                    color="series_label",
+                    title="Graph 1: Latency vs Chunk Parallel Requests (split by resolution + mode)",
+                    x_title="Chunk Parallel Requests",
+                    y_title="Latency (ms)",
+                    color_title="Series (Resolution / Mode)",
+                    x_axis_format=".0f",
+                    height=280,
+                    caption="Use the chart toolbar (top-right) for Fullscreen and Export.",
+                    tooltip=[
+                        "combo_label",
+                        "resolution_label",
+                        "segmentation_mode",
+                        "request_concurrency",
+                        "latency_ms",
+                    ],
+                    buttons=["fullscreen", "export"],
+                )
+                throughput_plot = gr.LinePlot(
+                    x="request_concurrency",
+                    y="throughput_tokens_per_sec",
+                    color="series_label",
+                    title="Graph 2: Throughput vs Chunk Parallel Requests (split by resolution + mode)",
+                    x_title="Chunk Parallel Requests",
+                    y_title="Output Tokens / sec",
+                    color_title="Series (Resolution / Mode)",
+                    x_axis_format=".0f",
+                    height=280,
+                    caption="Use the chart toolbar (top-right) for Fullscreen and Export.",
+                    tooltip=[
+                        "combo_label",
+                        "resolution_label",
+                        "segmentation_mode",
+                        "request_concurrency",
+                        "throughput_tokens_per_sec",
+                    ],
+                    buttons=["fullscreen", "export"],
+                )
+            with gr.Row(equal_height=True):
+                time_split_plot = gr.BarPlot(
+                    x="config_label",
+                    y="completion_time_ms",
+                    color="segmentation_mode",
+                    title="Graph 3: Full Video Completion Time (ms, segmented vs non-segmented)",
+                    x_title="Config",
+                    y_title="Completion Time (ms)",
+                    color_title="Segmentation Mode",
+                    height=280,
+                    caption="Lower is better.",
+                    tooltip=[
+                        "combo_label",
+                        "resolution_label",
+                        "segmentation_mode",
+                        "request_concurrency",
+                        "completion_time_ms",
+                    ],
+                    buttons=["fullscreen", "export"],
+                )
+                tokens_scatter_plot = gr.BarPlot(
+                    x="combo_label",
+                    y="pct_value",
+                    color="stage",
+                    title="Graph 4: Stacked Time Split by Combo",
+                    x_title="Combo (mode/height/chunk parallel requests)",
+                    y_title="Percent of Total Time",
+                    color_title="Stage",
+                    height=280,
+                    caption="Preprocess % + Request %",
+                    tooltip=[
+                        "combo_label",
+                        "segmentation_mode",
+                        "target_height",
+                        "request_concurrency",
+                        "pct_value",
+                    ],
+                    buttons=["fullscreen", "export"],
+                )
 
         with gr.Tab("History"):
             gr.Markdown(
@@ -774,11 +1099,27 @@ def build_ui_blocks() -> gr.Blocks:
             extra_body_json,
             extra_headers_json,
         ]
+        run_inputs_single = run_inputs + [single_run_request_concurrency]
 
         run_button.click(
             fn=_run_single,
-            inputs=run_inputs,
+            inputs=run_inputs_single,
             outputs=[run_output, run_json, effective_request, run_status],
+        )
+        prompt_mode.change(
+            fn=_apply_prompt_mode,
+            inputs=[prompt_mode, prompt, tag_categories],
+            outputs=[prompt],
+        )
+        tag_categories.change(
+            fn=_refresh_prompt_for_tagging,
+            inputs=[prompt_mode, prompt, tag_categories],
+            outputs=[prompt],
+        )
+        segmentation_profile.change(
+            fn=_apply_segmentation_profile,
+            inputs=[segmentation_profile, segment_max_duration_s, segment_overlap_s],
+            outputs=[segment_max_duration_s, segment_overlap_s],
         )
         image_upload.change(
             fn=_image_preview_value,
@@ -799,11 +1140,20 @@ def build_ui_blocks() -> gr.Blocks:
                 warmup_runs,
                 resolution_heights,
                 request_concurrency,
-                segment_workers_sweep,
+                wait_between_combos_s,
+                include_non_segmented_baseline,
                 continue_on_error,
                 benchmark_label,
             ],
-            outputs=[benchmark_summary, benchmark_json, benchmark_artifacts],
+            outputs=[
+                benchmark_summary,
+                benchmark_json,
+                benchmark_artifacts,
+                latency_plot,
+                throughput_plot,
+                time_split_plot,
+                tokens_scatter_plot,
+            ],
         )
 
         refresh_history_btn.click(

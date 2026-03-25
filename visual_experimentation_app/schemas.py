@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 ThinkingMode = Literal["auto", "on", "off"]
 RunStatus = Literal["ok", "error"]
 BenchmarkStatus = Literal["ok", "partial", "error"]
+SegmentationMode = Literal["segmented", "non_segmented"]
 
 
 class RunRequest(BaseModel):
@@ -141,6 +142,8 @@ class BenchmarkRequest(BaseModel):
     resolution_heights: list[int] = Field(default_factory=list)
     request_concurrency: list[int] = Field(default_factory=lambda: [1])
     segment_workers: list[int] = Field(default_factory=lambda: [1])
+    include_non_segmented_baseline: bool = True
+    wait_between_combos_s: float = Field(default=0.0, ge=0.0, le=600.0)
     continue_on_error: bool = True
     label: str | None = None
 
@@ -155,6 +158,7 @@ class BenchmarkRecord(BaseModel):
     target_height: int
     request_concurrency: int
     segment_workers: int
+    segmentation_mode: SegmentationMode = "segmented"
     status: RunStatus
     preprocess_ms: float
     request_ms: float
@@ -162,6 +166,13 @@ class BenchmarkRecord(BaseModel):
     ttft_ms: float | None = None
     output_hash: str | None = None
     output_chars: int = 0
+    prompt_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    preprocess_pct: float | None = None
+    request_pct: float | None = None
+    ms_per_output_token: float | None = None
+    ms_per_100_output_tokens: float | None = None
     error: str | None = None
 
 
@@ -172,6 +183,7 @@ class BenchmarkAggregate(BaseModel):
     target_height: int
     request_concurrency: int
     segment_workers: int
+    segmentation_mode: SegmentationMode = "segmented"
     sample_count: int
     success_count: int
     p50_total_ms: float | None = None
@@ -181,6 +193,11 @@ class BenchmarkAggregate(BaseModel):
     avg_total_ms: float | None = None
     unique_output_count: int = 0
     output_consistency_ratio: float | None = None
+    experiment_wall_time_ms: float | None = None
+    total_output_tokens_across_all_parallel_requests: int | None = None
+    throughput_tokens_per_sec: float | None = None
+    throughput_requests_per_sec: float | None = None
+    token_metrics_coverage_ratio: float | None = None
 
 
 class BenchmarkResult(BaseModel):

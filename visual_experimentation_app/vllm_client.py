@@ -43,6 +43,18 @@ class RunExecution:
     ttft_ms: float | None
     effective_params: dict[str, Any]
     media_metadata: dict[str, Any]
+    prompt_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+
+
+@dataclass(frozen=True)
+class TokenUsage:
+    """Token accounting captured from API usage metadata."""
+
+    prompt_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
 
 
 def _effective_setting(value: str | None, fallback: str) -> str:
@@ -54,6 +66,72 @@ def _effective_timeout(value: float | None, fallback: float) -> float:
     if value is None:
         return fallback
     return max(1.0, float(value))
+
+
+_VIDEO_PROCESSOR_HINT = (
+    "vLLM video processor rejected this request (Qwen3VLProcessor). "
+    "Try lowering video sampling FPS, enabling Safe video sampling, "
+    "reducing segment workers, or using shorter segment duration."
+)
+
+
+def _exception_text(exc: Exception) -> str:
+    parts: list[str] = [str(exc)]
+
+    body = getattr(exc, "body", None)
+    if body:
+        try:
+            parts.append(json.dumps(body, ensure_ascii=True, default=str))
+        except (TypeError, ValueError):
+            parts.append(str(body))
+
+    response = getattr(exc, "response", None)
+    if response is not None:
+        try:
+            response_text = getattr(response, "text", "")
+            if response_text:
+                parts.append(str(response_text))
+        except Exception:  # noqa: BLE001
+            pass
+
+    return "\n".join(part for part in parts if part).lower()
+
+
+def is_video_processor_error(exc: Exception) -> bool:
+    """Return whether exception text matches known video processor failures."""
+    text = _exception_text(exc)
+    return (
+        "failed to apply qwen3vlprocessor" in text
+        or ("error in preprocessing prompt inputs" in text and "video" in text)
+        or (
+            "video_processing_utils" in text
+            and "out of bounds" in text
+            and "index" in text
+        )
+    )
+
+
+def summarize_execution_error(exc: Exception) -> str:
+    """Return concise, actionable run error text for UI/API responses."""
+    if is_video_processor_error(exc):
+        return _VIDEO_PROCESSOR_HINT
+
+    raw_error = str(exc).strip() or exc.__class__.__name__
+    if len(raw_error) <= 700:
+        return raw_error
+    return f"{raw_error[:700]}..."
+
+
+def build_execution_error_details(exc: Exception) -> dict[str, Any]:
+    """Build rich error details while keeping UI-facing message concise."""
+    details: dict[str, Any] = {
+        "error_type": exc.__class__.__name__,
+        "is_video_processor_error": is_video_processor_error(exc),
+        "raw_error": str(exc).strip() or repr(exc),
+    }
+    if details["is_video_processor_error"]:
+        details["hint"] = _VIDEO_PROCESSOR_HINT
+    return details
 
 
 def _format_assistant_output(
@@ -173,6 +251,46 @@ def _chat_completion_kwargs(
     return kwargs
 
 
+def _int_or_none(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_usage_tokens(payload: object) -> TokenUsage:
+    usage = getattr(payload, "usage", None)
+    if usage is None:
+        return TokenUsage()
+    return TokenUsage(
+        prompt_tokens=_int_or_none(getattr(usage, "prompt_tokens", None)),
+        output_tokens=_int_or_none(getattr(usage, "completion_tokens", None)),
+        total_tokens=_int_or_none(getattr(usage, "total_tokens", None)),
+    )
+
+
+def _sum_token_usage(usages: Iterable[TokenUsage]) -> TokenUsage:
+    usage_list = list(usages)
+
+    prompt_values = [
+        value for value in (item.prompt_tokens for item in usage_list) if value is not None
+    ]
+    output_values = [
+        value for value in (item.output_tokens for item in usage_list) if value is not None
+    ]
+    total_values = [
+        value for value in (item.total_tokens for item in usage_list) if value is not None
+    ]
+
+    return TokenUsage(
+        prompt_tokens=sum(prompt_values) if prompt_values else None,
+        output_tokens=sum(output_values) if output_values else None,
+        total_tokens=sum(total_values) if total_values else None,
+    )
+
+
 def _invoke_completion(
     *,
     client: OpenAI,
@@ -180,7 +298,7 @@ def _invoke_completion(
     model: str,
     messages: list[dict[str, object]],
     extra_body: dict[str, Any],
-) -> tuple[str, float | None]:
+) -> tuple[str, float | None, TokenUsage]:
     kwargs = _chat_completion_kwargs(
         request=request,
         model=model,
@@ -191,7 +309,7 @@ def _invoke_completion(
     if not request.measure_ttft:
         response = client.chat.completions.create(**kwargs)
         if not response.choices:
-            return "", None
+            return "", None, _extract_usage_tokens(response)
         content, reasoning = extract_message_parts(response.choices[0].message)
         return (
             _format_assistant_output(
@@ -200,15 +318,28 @@ def _invoke_completion(
                 include_reasoning=request.show_reasoning,
             ),
             None,
+            _extract_usage_tokens(response),
         )
 
     start = time.perf_counter()
     first_chunk_time: float | None = None
     content_chunks: list[str] = []
     reasoning_chunks: list[str] = []
+    final_usage = TokenUsage()
 
-    stream = client.chat.completions.create(stream=True, **kwargs)
+    stream = client.chat.completions.create(
+        stream=True,
+        stream_options={"include_usage": True},
+        **kwargs,
+    )
     for event in stream:
+        event_usage = _extract_usage_tokens(event)
+        if (
+            event_usage.prompt_tokens is not None
+            or event_usage.output_tokens is not None
+            or event_usage.total_tokens is not None
+        ):
+            final_usage = event_usage
         if not event.choices:
             continue
         delta = event.choices[0].delta
@@ -233,7 +364,7 @@ def _invoke_completion(
         include_reasoning=request.show_reasoning,
     )
     ttft_ms = ((first_chunk_time - start) * 1000.0) if first_chunk_time is not None else None
-    return output, ttft_ms
+    return output, ttft_ms, final_usage
 
 
 def _build_client(
@@ -304,7 +435,7 @@ def _run_non_segmented(
     model: str,
     extra_body: dict[str, Any],
     prepared: PreparedMedia,
-) -> tuple[str, float | None]:
+) -> tuple[str, float | None, TokenUsage]:
     messages = _prepare_message_payloads(
         prompt=request.prompt,
         text_input=request.text_input,
@@ -334,7 +465,7 @@ def _run_segmented(
     base_url: str,
     api_key: str,
     timeout_seconds: float,
-) -> tuple[str, float | None]:
+) -> tuple[str, float | None, TokenUsage]:
     if len(segments) == 1:
         messages = _prepare_message_payloads(
             prompt=request.prompt,
@@ -354,9 +485,11 @@ def _run_segmented(
         )
 
     worker_count = max(1, min(request.segment_workers, len(segments)))
-    results: list[tuple[str, float | None]] = [("", None)] * len(segments)
+    results: list[tuple[str, float | None, TokenUsage]] = [
+        ("", None, TokenUsage()) for _ in segments
+    ]
 
-    def run_one(index: int, segment: SegmentClip) -> tuple[int, str, float | None]:
+    def run_one(index: int, segment: SegmentClip) -> tuple[int, str, float | None, TokenUsage]:
         threaded_client = _build_client(
             base_url=base_url,
             api_key=api_key,
@@ -372,14 +505,14 @@ def _run_segmented(
             video_cache_uuids=[],
             disable_caching=request.disable_caching,
         )
-        text, ttft = _invoke_completion(
+        text, ttft, usage = _invoke_completion(
             client=threaded_client,
             request=request,
             model=model,
             messages=messages,
             extra_body=extra_body,
         )
-        return index, text, ttft
+        return index, text, ttft, usage
 
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
         futures = {
@@ -387,20 +520,23 @@ def _run_segmented(
             for index, segment in enumerate(segments)
         }
         for future in as_completed(futures):
-            index, text, ttft = future.result()
-            results[index] = (text, ttft)
+            index, text, ttft, usage = future.result()
+            results[index] = (text, ttft, usage)
 
     sections: list[str] = []
     ttft_values: list[float] = []
+    usage_values: list[TokenUsage] = []
     for index, segment in enumerate(segments, start=1):
-        text, ttft = results[index - 1]
+        text, ttft, usage = results[index - 1]
         section_body = text.strip() or "_No output._"
         sections.append(f"{_segment_header(segment, index, len(segments))}\n{section_body}")
         if ttft is not None:
             ttft_values.append(ttft)
+        usage_values.append(usage)
     combined = "\n\n".join(sections)
     aggregate_ttft = min(ttft_values) if ttft_values else None
-    return combined, aggregate_ttft
+    aggregate_usage = _sum_token_usage(usage_values)
+    return combined, aggregate_ttft, aggregate_usage
 
 
 def execute_run(request: RunRequest) -> RunExecution:
@@ -429,6 +565,7 @@ def execute_run(request: RunRequest) -> RunExecution:
 
     request_start = time.perf_counter()
     cache_salt: str | None = None
+    token_usage = TokenUsage()
     try:
         extra_body = merge_extra_body(
             user_extra_body=request.request_extra_body,
@@ -451,7 +588,7 @@ def execute_run(request: RunRequest) -> RunExecution:
         )
 
         if not segments:
-            output_text, ttft_ms = _run_non_segmented(
+            output_text, ttft_ms, token_usage = _run_non_segmented(
                 client=client,
                 request=request,
                 model=model,
@@ -459,7 +596,7 @@ def execute_run(request: RunRequest) -> RunExecution:
                 prepared=prepared,
             )
         else:
-            output_text, ttft_ms = _run_segmented(
+            output_text, ttft_ms, token_usage = _run_segmented(
                 client=client,
                 request=request,
                 model=model,
@@ -528,4 +665,7 @@ def execute_run(request: RunRequest) -> RunExecution:
         ttft_ms=ttft_ms,
         effective_params=effective_params,
         media_metadata=prepared.metadata,
+        prompt_tokens=token_usage.prompt_tokens,
+        output_tokens=token_usage.output_tokens,
+        total_tokens=token_usage.total_tokens,
     )

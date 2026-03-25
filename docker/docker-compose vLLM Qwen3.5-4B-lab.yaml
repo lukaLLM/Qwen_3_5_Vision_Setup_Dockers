@@ -33,20 +33,35 @@ services:
     command:
       # Model to serve.
       - Qwen/Qwen3.5-4B
+      # Attention backend for standard attention (MHA/MQA/GQA).
+      # Override from shell/.env: VLLM_ATTENTION_BACKEND=FLASHINFER|FLASH_ATTN|TRITON_ATTN|FLEX_ATTENTION
+      # - --attention-backend
+      # - ${VLLM_ATTENTION_BACKEND:-FLASH_ATTN}
+      # # vLLM optimization level (O3 = aggressive).
+      # - -O${VLLM_OPT_LEVEL:-3}
       # OpenAI-compatible server bind settings.
       - --host
       - 0.0.0.0
       - --port
       - "8000"
-      # Engine throughput concurrency (increase carefully; can raise VRAM usage).
+      # Engine throughput concurrency (startup-only arg; requires container recreate).
       - --max-num-seqs
-      - "1"
+      - "8"
+      # Chunked prefill toggle via env var (explicit ON by default).
+      # Set in .env:
+      #   VLLM_CHUNKED_PREFILL_FLAG=--enable-chunked-prefill
+      # Default:
+      #   --enable-chunked-prefill
+      #- ${VLLM_CHUNKED_PREFILL_FLAG:---enable-chunked-prefill}
+      # Scheduler batch token budget (startup-only arg; requires container recreate).
+      # - --max-num-batched-tokens
+      # - "34000"
       # Fraction of GPU memory vLLM may use.
       - --gpu-memory-utilization
       - "0.5"
       # Sets the maximum total tokens (input + output) the model can process in a single request; this is the model's context window.  
       - --max-model-len
-      - "20000"
+      - "34000"
       # Multimodal encoder TP behavior (recommended: data for this profile).
       - --mm-encoder-tp-mode
       - data
@@ -55,7 +70,7 @@ services:
       - shm
       # Per-prompt multimodal input caps.
       - --limit-mm-per-prompt
-      - '{"image":4,"video":2}'
+      - '{"image":4,"video":8}'
       # Server media IO behavior (startup arg; requires container recreate to change).
       # num_frames=-1 means "no fixed frame cap" at media IO stage.
       - --media-io-kwargs
@@ -64,14 +79,17 @@ services:
       # from MM Lab UI/API via extra_body.mm_processor_kwargs.
       - --mm-processor-kwargs
       - '{"do_sample_frames":false,"fps":1.0}'
-      # Qwen3 reasoning parser.
-      - --reasoning-parser
-      - qwen3
+      # Qwen3 reasoning parser (disabled by default).
+      # Uncomment to enable explicit reasoning parsing.
+      # - --reasoning-parser
+      # - qwen3
       # Prefix cache OFF for strict benchmark consistency (lower variance, slower repeats).
       # Uncomment the line below for production-like repeated prompt latency.
       - --enable-prefix-caching
-      # - --no-enable-prefix-caching
+      #- --no-enable-prefix-caching
+      # --enable-chunked-prefill
+      # --no-enable-chunked-prefill
       # # Disable MM processor cache budget (strict no-cache benchmarking).
-      # - --mm-processor-cache-gb
-      # - "0"
+      - --mm-processor-cache-gb
+      - "0"
  
