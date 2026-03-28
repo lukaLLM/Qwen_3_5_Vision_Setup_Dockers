@@ -90,64 +90,62 @@ docker compose -f "Inference_Single/docker-compose vLLM Qwen3.5-27B-GPTQ-Int4.ya
 docker compose -f "Inference_Single/docker-compose vLLM Qwen3.5-27B-FP8.yaml" up -d
 ```
 
-### Test attention backend + aggressive optimization (`-O3`)
+### 4B Lab Profile Defaults (Current)
 
-All vLLM compose profiles now accept:
+`docker/docker-compose vLLM Qwen3.5-4B-lab.yaml` currently defaults to:
 
-- `VLLM_ATTENTION_BACKEND` (`FLASH_ATTN`, `FLASHINFER`, `TRITON_ATTN`, `FLEX_ATTENTION`)
-- `VLLM_OPT_LEVEL` (`3` = aggressive; current vLLM docs note it is presently equivalent to `-O2`)
+- `image: vllm/vllm-openai:latest`
+- `--attention-backend ${VLLM_ATTENTION_BACKEND:-TRITON_ATTN}`
+- `--max-num-seqs 10`
+- `--max-num-batched-tokens 10000`
+- `--gpu-memory-utilization 0.4`
+- `--max-model-len 10000`
+- `--mm-processor-kwargs {"do_sample_frames":true,"fps":1.0}`
+- `--no-enable-prefix-caching`
+- `--mm-processor-cache-gb 0`
 
-Run with temporary shell overrides (no file edits needed):
+### Test Attention Backend (4B Lab)
+
+The 4B lab profile supports temporary backend override via `VLLM_ATTENTION_BACKEND`.
 
 ```bash
-VLLM_ATTENTION_BACKEND=FLASHINFER VLLM_OPT_LEVEL=3 \
+VLLM_ATTENTION_BACKEND=FLASHINFER \
 docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" up -d --force-recreate
 ```
 
-Check which backend was actually selected:
+Check which backend was selected:
 
 ```bash
 docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" logs vllm | rg "Using backend|Using FLASH_ATTN|FLASHINFER|TRITON_ATTN|FLEX_ATTENTION"
 ```
+
+If you hit a crash inside `vllm/v1/attention/backends/flex_attention.py` with a
+`view size is not compatible` error on long video requests, switch away from
+`FLEX_ATTENTION` first. In this repo, the 4B lab default is `TRITON_ATTN`.
+For long segmented videos, keep chunk parallel requests at `1` until you confirm
+higher values are stable on your GPU/runtime combo.
 
 Quick sweep example:
 
 ```bash
 for b in FLASH_ATTN FLASHINFER TRITON_ATTN FLEX_ATTENTION; do
   echo "=== backend: $b ==="
-  VLLM_ATTENTION_BACKEND="$b" VLLM_OPT_LEVEL=3 \
+  VLLM_ATTENTION_BACKEND="$b" \
   docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" up -d --force-recreate
   sleep 8
   docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" logs --tail=120 vllm | rg "Using backend|Error|exception" || true
 done
 ```
 
-### Chunked Prefill Toggle (Explicit ON/OFF)
+`-O3` tuning in the 4B lab profile is currently commented out. To benchmark it,
+uncomment `- -O${VLLM_OPT_LEVEL:-3}` in the compose file, then run with
+`VLLM_OPT_LEVEL=3`.
 
-Chunked prefill is wired as an explicit compose flag so behavior is unambiguous.
+Chunked prefill flags in the 4B lab profile are also commented out. If you need
+to force ON/OFF behavior there, uncomment one of:
 
-- Default (from `.env.example`): `VLLM_CHUNKED_PREFILL_FLAG=--no-enable-chunked-prefill`
-- Opt in: `VLLM_CHUNKED_PREFILL_FLAG=--enable-chunked-prefill`
-
-Example:
-
-```bash
-VLLM_CHUNKED_PREFILL_FLAG=--enable-chunked-prefill \
-docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" up -d --force-recreate
-```
-
-Validate what compose will pass:
-
-```bash
-VLLM_CHUNKED_PREFILL_FLAG=--enable-chunked-prefill \
-docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" config | rg "chunked-prefill"
-```
-
-Check runtime logs:
-
-```bash
-docker compose -f "docker/docker-compose vLLM Qwen3.5-4B-lab.yaml" logs vllm | rg -i "chunked|prefill"
-```
+- `--enable-chunked-prefill`
+- `--no-enable-chunked-prefill`
 
 Stop:
 
@@ -192,3 +190,14 @@ uv run python -m visual_experimentation_app.main
 Detailed app docs and API routes:
 
 - `visual_experimentation_app/README.md`
+- Includes a prompt preset: `Benchmarking (Visible Chunk Summary)` for
+  chunk-level benchmarking outputs (exactly 4 sentences, 6 bullet points, and
+  8 keywords).
+
+## References
+
+- https://docs.vllm.ai/en/stable/features/multimodal_inputs/
+- https://docs.vllm.ai/en/latest/serving/openai_compatible_server/
+- https://github.com/vllm-project/vllm/blob/main/docs/configuration/optimization.md
+- https://blog.overshoot.ai/blog/qwen3.5-on-overshoot
+- https://build.nvidia.com/nvidia/video-search-and-summarization

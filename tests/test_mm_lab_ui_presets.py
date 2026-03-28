@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
 
 from visual_experimentation_app.ui_presets import (  # noqa: E402
     DEFAULT_TAG_CATEGORIES,
+    PROMPT_MODE_BENCHMARK_CHUNK,
     PROMPT_MODE_CLASSIFIER,
     PROMPT_MODE_CUSTOM,
     PROMPT_MODE_SEARCH_INDEXING,
@@ -56,6 +57,18 @@ class UiPresetsTest(unittest.TestCase):
         )
         self.assertIn("Return ONLY valid JSON", prompt)
         self.assertIn('"segments"', prompt)
+
+    def test_build_prompt_for_benchmark_chunk_mode_matches_requested_shape(self) -> None:
+        """Benchmark chunk preset should preserve the requested output constraints."""
+        prompt = build_prompt_for_mode(
+            mode=PROMPT_MODE_BENCHMARK_CHUNK,
+            current_prompt="ignored",
+            tag_categories_csv="",
+        )
+        self.assertIn("Exactly 4 sentences", prompt)
+        self.assertIn("Exactly 6 bullet points", prompt)
+        self.assertIn("Exactly 8 keywords", prompt)
+        self.assertIn("Use only visible evidence", prompt)
 
     def test_build_prompt_for_tagging_injects_categories(self) -> None:
         """Tagging preset should inject allowed categories into prompt."""

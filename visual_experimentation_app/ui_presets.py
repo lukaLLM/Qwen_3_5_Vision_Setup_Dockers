@@ -10,6 +10,7 @@ DEFAULT_TAG_CATEGORIES = "anime, documentary, action/adventure, drama"
 PROMPT_MODE_CUSTOM = "Custom"
 PROMPT_MODE_SEARCH_INDEXING = "Search/Indexing"
 PROMPT_MODE_SUMMARIZATION = "Understanding/Summarization"
+PROMPT_MODE_BENCHMARK_CHUNK = "Benchmarking (Visible Chunk Summary)"
 PROMPT_MODE_TAGGING = "Tagging"
 PROMPT_MODE_CLASSIFIER = "Classifier (Single Category)"
 PROMPT_MODE_VIDEO_TYPE_ONE_WORD = "Video Type (One Word)"
@@ -18,6 +19,7 @@ PROMPT_MODE_CHOICES = [
     PROMPT_MODE_CUSTOM,
     PROMPT_MODE_SEARCH_INDEXING,
     PROMPT_MODE_SUMMARIZATION,
+    PROMPT_MODE_BENCHMARK_CHUNK,
     PROMPT_MODE_TAGGING,
     PROMPT_MODE_CLASSIFIER,
     PROMPT_MODE_VIDEO_TYPE_ONE_WORD,
@@ -96,6 +98,13 @@ Requirements:
 - Keep key_events chronologically ordered.
 """
 
+_BENCHMARK_CHUNK_PROMPT = """Analyze this video chunk and produce:
+1. Exactly 4 sentences summarizing the main visible events.
+2. Exactly 6 bullet points listing important actions or scene changes.
+3. Exactly 8 keywords describing the content.
+
+Use only visible evidence. Keep the output concise and factual."""
+
 _VIDEO_TYPE_ONE_WORD_PROMPT = """Classify the primary video type.
 
 Return exactly one lowercase word.
@@ -138,6 +147,8 @@ def build_prompt_for_mode(*, mode: str, current_prompt: str, tag_categories_csv:
         return _SEARCH_INDEXING_PROMPT
     if mode == PROMPT_MODE_SUMMARIZATION:
         return _SUMMARIZATION_PROMPT
+    if mode == PROMPT_MODE_BENCHMARK_CHUNK:
+        return _BENCHMARK_CHUNK_PROMPT
     if mode == PROMPT_MODE_VIDEO_TYPE_ONE_WORD:
         return _VIDEO_TYPE_ONE_WORD_PROMPT
     if mode not in {PROMPT_MODE_TAGGING, PROMPT_MODE_CLASSIFIER}:

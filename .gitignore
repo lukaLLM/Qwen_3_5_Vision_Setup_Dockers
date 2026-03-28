@@ -21,3 +21,4 @@ Qwen3.5-main/.github/copilot-instructions.md
 visual_experimentation_app/results/benchmark_history.jsonl
 bench_*.json
 bench_*.csv
+.codex

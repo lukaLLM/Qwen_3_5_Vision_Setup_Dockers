@@ -13,8 +13,7 @@ This folder provides a local-only experimentation setup for Qwen3.5 multimodal t
 - Qwen 3.5 Vision – The ONLY LOCAL Setup YOU NEED (No Ollama/LM Studio)!  https://youtu.be/-sl0oe3-Awc
 
 
-## System Requirements
-## Docker Requirements
+## Requirements
 
 - Linux with NVIDIA driver + CUDA-capable GPU
 - Docker Engine with Compose plugin (`docker compose`)
@@ -26,6 +25,11 @@ References:
 - Root setup and model download guide: `../README.md`
 - MM lab vLLM compose profile: `../docker/docker-compose vLLM Qwen3.5-4B-lab.yaml`
 - Additional inference compose profiles: `../Inference_Single/`
+- https://docs.vllm.ai/en/stable/features/multimodal_inputs/
+- https://docs.vllm.ai/en/latest/serving/openai_compatible_server/
+- https://github.com/vllm-project/vllm/blob/main/docs/configuration/optimization.md
+- https://blog.overshoot.ai/blog/qwen3.5-on-overshoot
+- https://build.nvidia.com/nvidia/video-search-and-summarization
 
 ## Start
 
@@ -45,6 +49,38 @@ Defaults:
 
 - UI: `http://127.0.0.1:7870/`
 - API: `http://127.0.0.1:7870/api`
+
+### Current 4B Lab Compose Defaults
+
+`../docker/docker-compose vLLM Qwen3.5-4B-lab.yaml` currently uses:
+
+- `vllm/vllm-openai:latest`
+- `--attention-backend ${VLLM_ATTENTION_BACKEND:-TRITON_ATTN}`
+- `--max-num-seqs 10`
+- `--max-num-batched-tokens 10000`
+- `--gpu-memory-utilization 0.4`
+- `--max-model-len 10000`
+- `--mm-processor-kwargs {"do_sample_frames":true,"fps":1.0}`
+- `--no-enable-prefix-caching`
+
+## Prompt Presets
+
+The UI "Prompt Mode" dropdown includes:
+
+- `Custom`
+- `Search/Indexing`
+- `Understanding/Summarization`
+- `Benchmarking (Visible Chunk Summary)`
+- `Tagging`
+- `Classifier (Single Category)`
+- `Video Type (One Word)`
+
+`Benchmarking (Visible Chunk Summary)` is designed for chunk-level benchmark
+comparisons and asks for a fixed output shape:
+
+- Exactly 4 summary sentences
+- Exactly 6 bullet points
+- Exactly 8 keywords
 
 ## Local API Endpoints
 
@@ -88,7 +124,7 @@ The lab compose file exposes key knobs for multimodal experiments:
 - `--media-io-kwargs` for video frame intake behavior.
 - `--max-num-seqs` for request concurrency at engine level.
 - `--gpu-memory-utilization` and `--max-model-len` for memory/performance tradeoffs.
-- `--mm-processor-cache-type` and `--enable-prefix-caching` for reuse/caching behavior.
+- `--mm-processor-cache-type` and prefix caching flags for reuse/caching behavior.
 
 Reference:
 
@@ -151,4 +187,6 @@ As of **March 14, 2026**, vLLM PR `#33956` remains open:
 
 - https://github.com/vllm-project/vllm/pull/33956
 
-The lab defaults to safer video processor settings (`do_sample_frames=false`) with an override toggle in UI/API.
+The compose profile now defaults to `do_sample_frames=true` (with `fps=1.0`) for
+video sampling. The UI/API still provide a "safe video processor defaults"
+toggle to force `do_sample_frames=false` when you need safer behavior.
