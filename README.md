@@ -1,6 +1,7 @@
 # Qwen Image - Local Inference Setup
 
-## YouTube link with explanation
+## YouTube Videos
+- Run Any Video Through Qwen 3.5 Visual AI in Seconds! With low Context. It's Insane! https://www.youtube.com/watch?v=BxDfOPcak5k
 - Qwen 3.5 Vision – The ONLY LOCAL Setup YOU NEED (No Ollama/LM Studio)!  https://youtu.be/-sl0oe3-Awc
 - Qwen 3.5 Vision AI Speed Tuning: 30 Seconds → 2 Seconds https://youtu.be/thM6Sz_0YhE
 
@@ -31,7 +32,7 @@ source .venv/bin/activate
 uv add hf-transfer huggingface-hub openai
 ```
 
-Add your token in `.env if you want faster download using download_qwen_models.sh etc.
+Add your token in `.env` if you want faster download using download_qwen_models.sh etc.
 
 ```bash
 HF_TOKEN=your_huggingface_token_here
@@ -193,6 +194,10 @@ Detailed app docs and API routes:
 - Includes a prompt preset: `Benchmarking (Visible Chunk Summary)` for
   chunk-level benchmarking outputs (exactly 4 sentences, 6 bullet points, and
   8 keywords).
+
+## Benchmark Results
+
+Benchmark executive summary: [`benchmark_qwen35_video.csv`](benchmark_qwen35_video.csv)
 
 ## References
 
