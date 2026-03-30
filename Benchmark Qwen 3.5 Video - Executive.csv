@@ -1,8 +1,0 @@
-vLLM Benchmark Executive Summary,,
-,,
-Best overall,TRITON_ATTN rc8/sw8,Best combined score
-Lowest avg latency,TRITON_vllm-openai_latest rc10/sw10,16.64 s
-Best throughput,TRITON_vllm-openai_latest rc10/sw10,105.15 tok/s
-Best TTFT,FLASHINFER rc1/sw1,511 ms
-Best stability,FLASH_ATTN rc1/sw1,Outlier ratio 1.003
-Key tuning change,"Added speedup overview, findings, notes, preprocess/request chart, and presentation script",
