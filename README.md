@@ -8,7 +8,7 @@
 
 ## Benchmark
 
-Benchmark results CSV: <!-- add link here -->
+Benchmark results CSV: [`Benchmark Qwen 3.5 Video.csv`](Benchmark%20Qwen%203.5%20Video.csv)
 
 ## System Requirements
 

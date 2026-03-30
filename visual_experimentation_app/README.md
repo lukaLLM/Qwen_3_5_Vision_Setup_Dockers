@@ -16,7 +16,7 @@ This folder provides a local-only experimentation setup for Qwen3.5 multimodal t
 
 ## Benchmark
 
-Benchmark results CSV: <!-- add link here -->
+Benchmark results CSV: [`Benchmark Qwen 3.5 Video.csv`](../Benchmark%20Qwen%203.5%20Video.csv)
 
 
 ## Requirements
