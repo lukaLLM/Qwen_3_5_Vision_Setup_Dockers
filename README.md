@@ -1,8 +1,14 @@
 # Qwen Image - Local Inference Setup
 
-## YouTube link with explanation
-- Qwen 3.5 Vision – The ONLY LOCAL Setup YOU NEED (No Ollama/LM Studio)!  https://youtu.be/-sl0oe3-Awc
+## YouTube Videos
+
+- Qwen 3.5 Vision – The ONLY LOCAL Setup YOU NEED (No Ollama/LM Studio)! https://youtu.be/-sl0oe3-Awc
 - Qwen 3.5 Vision AI Speed Tuning: 30 Seconds → 2 Seconds https://youtu.be/thM6Sz_0YhE
+- 🆕 Run Any Video Through Qwen 3.5 Visual AI in Seconds! With low Context. It's Insane! https://www.youtube.com/watch?v=BxDfOPcak5k
+
+## Benchmark
+
+Benchmark results CSV: [`Benchmark Qwen 3.5 Video.csv`](Benchmark%20Qwen%203.5%20Video.csv)
 
 ## System Requirements
 

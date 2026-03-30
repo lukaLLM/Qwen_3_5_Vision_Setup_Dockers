@@ -8,9 +8,15 @@ This folder provides a local-only experimentation setup for Qwen3.5 multimodal t
 - Timing capture
 - JSON + JSONL run artifacts
 
-## YouTube link with explanation
+## YouTube Videos
+
+- Qwen 3.5 Vision – The ONLY LOCAL Setup YOU NEED (No Ollama/LM Studio)! https://youtu.be/-sl0oe3-Awc
 - Qwen 3.5 Vision AI Speed Tuning: 30 Seconds → 2 Seconds https://youtu.be/thM6Sz_0YhE
-- Qwen 3.5 Vision – The ONLY LOCAL Setup YOU NEED (No Ollama/LM Studio)!  https://youtu.be/-sl0oe3-Awc
+- 🆕 Run Any Video Through Qwen 3.5 Visual AI in Seconds! With low Context. It's Insane! https://www.youtube.com/watch?v=BxDfOPcak5k
+
+## Benchmark
+
+Benchmark results CSV: [`Benchmark Qwen 3.5 Video.csv`](../Benchmark%20Qwen%203.5%20Video.csv)
 
 
 ## Requirements
