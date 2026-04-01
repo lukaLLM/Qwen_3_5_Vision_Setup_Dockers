@@ -2,10 +2,10 @@
 
 ## YouTube Videos
 📹 THE ULTIMATE LOCAL AI & VLM SETUP SERIES:
-1️⃣ Build the Best Vision Setup (No Ollama): https://www.youtube.com/watch?v=-sl0oe3-Awc
-2️⃣ Speed Tune Your Vision AI (30s → 2s): https://www.youtube.com/watch?v=ZtGOZvkuTcw
-3️⃣ 🆕 Process 2-Hour Videos FAST: https://www.youtube.com/watch?v=BxDfOPcak5k
-4️⃣ The Ultimate Local AI Coding Workflow: https://www.youtube.com/watch?v=11rA29YacB8 
+- 1️⃣ Build the Best Vision Setup (No Ollama): https://www.youtube.com/watch?v=-sl0oe3-Awc
+- 2️⃣ Speed Tune Your Vision AI (30s → 2s): https://www.youtube.com/watch?v=ZtGOZvkuTcw
+- 3️⃣ 🆕 Process 2-Hour Videos FAST: https://www.youtube.com/watch?v=BxDfOPcak5k
+- 4️⃣ The Ultimate Local AI Coding Workflow: https://www.youtube.com/watch?v=11rA29YacB8 
 
 ## Benchmark
 
