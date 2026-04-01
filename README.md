@@ -205,24 +205,51 @@ Detailed app docs and API routes:
 
 ```mermaid
 flowchart TD
-    UI["🖥️ Gradio UI\ntarget_height · target_video_fps\nsegment_max_duration_s · segment_overlap_s\nsegment_workers"]
+    UI["🖥️ Gradio UI
+    ─────────────────────
+    target_height · target_video_fps
+    segment_max_duration_s · segment_overlap_s
+    segment_workers"]
 
-    Preprocess["🔧 ffmpeg re-encode\nscale=-2:target_height · fps cap"]
+    Preprocess["🔧 ffmpeg re-encode
+    ─────────────────────
+    scale=-2:target_height · fps cap"]
 
     Chunk{"segment_max_duration_s > 0?"}
-    Segments["✂️ Split into N chunks\nwith overlap"]
-    Full["Single full-video clip"]
 
-    Parallel["🔀 Dispatch N parallel requests\n(segment_workers)"]
+    Segments["✂️ Split into N chunks
+    with overlap"]
 
-    vLLM["🚀 vLLM  /v1/chat/completions\n--max-num-seqs limits concurrent requests"]
+    Full["▶ Single full-video clip"]
 
-    Result["📊 Results merged\nper-chunk → final output"]
+    Parallel["🔀 Dispatch N parallel requests
+    (segment_workers)"]
 
-    UI --> Preprocess --> Chunk
-    Chunk -- Yes --> Segments --> Parallel --> vLLM
-    Chunk -- No  --> Full --> vLLM
-    vLLM --> Result
+    vLLM["🚀 vLLM  /v1/chat/completions
+    ─────────────────────
+    --max-num-seqs caps concurrency"]
+
+    Result["📊 Results merged → final output"]
+
+    UI        --> Preprocess
+    Preprocess --> Chunk
+    Chunk      -- "Yes" --> Segments --> Parallel --> vLLM
+    Chunk      -- "No"  --> Full               --> vLLM
+    vLLM       --> Result
+
+    classDef ui        fill:#4A90D9,stroke:#2C5F8A,color:#fff,rx:8
+    classDef proc      fill:#5BA85A,stroke:#3A7039,color:#fff,rx:8
+    classDef decision  fill:#E8A838,stroke:#B07820,color:#fff
+    classDef branch    fill:#7B68C8,stroke:#5248A0,color:#fff,rx:8
+    classDef server    fill:#E05C5C,stroke:#A83838,color:#fff,rx:8
+    classDef result    fill:#4ABFBF,stroke:#2E8888,color:#fff,rx:8
+
+    class UI        ui
+    class Preprocess proc
+    class Chunk     decision
+    class Segments,Full,Parallel branch
+    class vLLM      server
+    class Result    result
 ```
 
 ## References
