@@ -1,10 +1,11 @@
 # Qwen Image - Local Inference Setup
 
 ## YouTube Videos
-
-- Qwen 3.5 Vision – The ONLY LOCAL Setup YOU NEED (No Ollama/LM Studio)! https://youtu.be/-sl0oe3-Awc
-- Qwen 3.5 Vision AI Speed Tuning: 30 Seconds → 2 Seconds https://youtu.be/thM6Sz_0YhE
-- 🆕 Run Any Video Through Qwen 3.5 Visual AI in Seconds! With low Context. It's Insane! https://www.youtube.com/watch?v=BxDfOPcak5k
+📹 THE ULTIMATE LOCAL AI & VLM SETUP SERIES:
+1️⃣ Build the Best Vision Setup (No Ollama): https://www.youtube.com/watch?v=-sl0oe3-Awc
+2️⃣ Speed Tune Your Vision AI (30s → 2s): https://www.youtube.com/watch?v=ZtGOZvkuTcw
+3️⃣ 🆕 Process 2-Hour Videos FAST: https://www.youtube.com/watch?v=BxDfOPcak5k
+4️⃣ The Ultimate Local AI Coding Workflow: https://www.youtube.com/watch?v=11rA29YacB8 
 
 ## Benchmark
 
