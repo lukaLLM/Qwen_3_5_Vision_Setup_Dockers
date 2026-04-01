@@ -1,0 +1,7 @@
+Graph,What it shows,How to interpret it,Main finding
+Recommended config avg latency,Average total latency for the recommended config per backend,Lower is better,TRITON_vllm-openai_latest rc10/sw10 is the raw latency leader.
+Recommended config throughput,Token throughput for the recommended config per backend,Higher is better,TRITON_vllm-openai_latest rc10/sw10 is the throughput leader.
+Speedup vs rc1,Scaling gain from each backend’s rc1 to its recommended config,Shows how much value scaling delivered inside each backend,Useful quick overview because it normalizes each backend against its own baseline.
+TTFT and outlier risk,Average TTFT and max-to-p50 latency ratio for the recommended config,Lower is better for both,Separates raw speed from production risk.
+Preprocess vs request split,Share of total time spent in preprocess versus request execution,A high preprocess share suggests front-end/video overhead; a high request share suggests model execution dominates,Helps explain whether gains came from inference efficiency or from reducing pipeline overhead.
+Supplemental latency trend,Average latency across rc values for all backends,Use only as backup detail,"Kept as support, not as the lead presentation graph."

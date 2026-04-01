@@ -1,0 +1,6 @@
+backend,config,most_important_finding,notes
+FLASH_ATTN,rc6/sw6,Competitive but not top of the leaderboard.,Competitive but not top of the leaderboard. No major anomaly
+FLASHINFER,rc6/sw6,Competitive but not top of the leaderboard.,Competitive but not top of the leaderboard. No major anomaly
+TRITON_ATTN,rc8/sw8,Best overall balanced winner.,Best overall balanced winner. Best overall
+TRITON_VLLM_OPT_LEVEL_-3,rc8/sw8,Competitive but not top of the leaderboard.,Competitive but not top of the leaderboard. No major anomaly
+TRITON_vllm-openai_latest,rc6/sw6,Competitive but not top of the leaderboard.,Competitive but not top of the leaderboard. No major anomaly
