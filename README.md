@@ -8,7 +8,7 @@
 
 ## Benchmark
 
-Benchmark results CSV: [`Benchmark Qwen 3.5 Video.csv`](Benchmark%20Qwen%203.5%20Video.csv)
+Benchmark results are available in the [`Benchmarks/`](Benchmarks/) folder.
 
 ## System Requirements
 
