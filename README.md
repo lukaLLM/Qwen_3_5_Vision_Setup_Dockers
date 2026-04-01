@@ -201,6 +201,83 @@ Detailed app docs and API routes:
   chunk-level benchmarking outputs (exactly 4 sentences, 6 bullet points, and
   8 keywords).
 
+### Gradio Preprocessing Pipeline
+
+The diagram below shows how media flows from the Gradio frontend controls through local preprocessing, optional video chunking, and payload assembly before reaching the vLLM inference backend.
+
+```mermaid
+flowchart TD
+    subgraph UI["🖥️ Gradio Frontend  (ui.py)"]
+        direction LR
+        Upload["📁 Upload\nImages / Videos"]
+        HeightParam["target_height\n(px — max resolution)"]
+        ImgToggle["preprocess_images ✓"]
+        VidToggle["preprocess_video ✓"]
+        FpsParam["target_video_fps\n(re-encode FPS cap)"]
+        SegProfile["Segmentation Profile\nBalanced · Fine-grained · Off · Custom"]
+        SegDur["segment_max_duration_s\n(chunk length in seconds)"]
+        SegOvlp["segment_overlap_s\n(overlap between chunks)"]
+        SegWork["segment_workers\n(parallel chunk requests)"]
+        SafeSamp["safe_video_sampling\n(bypass fps sampling)"]
+        SampFps["video_sampling_fps\n(vLLM-side FPS hint)"]
+    end
+
+    subgraph PrepareMedia["🔧 prepare_media()  ·  media_preprocess.py"]
+        Probe["ffprobe\n→ width · height · fps · duration"]
+
+        subgraph ImgBranch["Image Branch"]
+            ImgCheck{"preprocess_images\n&& height > target_height?"}
+            ImgScale["ffmpeg downscale\nscale=-2:target_height"]
+            ImgOrig["Use original path"]
+        end
+
+        subgraph VidBranch["Video Branch"]
+            VidCheck{"preprocess_video?"}
+            VidScale["ffmpeg re-encode\n• scale=-2:target_height\n• fps=target_video_fps\n• codec: libx264 veryfast"]
+            VidOrig["Use original path"]
+        end
+    end
+
+    subgraph Chunk["✂️ extract_video_segments()  ·  media_preprocess.py"]
+        SegCheck{"segment_max_duration_s > 0?"}
+        BuildRanges["build_segment_ranges()\n→ [ (0s,30s), (28s,58s), … ]"]
+        ExtractClips["_extract_segment() × N chunks\nffmpeg -ss start -t duration"]
+        NoChunk["Single full-video clip"]
+    end
+
+    subgraph PayloadBuild["📦 payload_builder.py"]
+        Encode["encode_file_to_data_url()\nfile → data:mime;base64,…"]
+        BuildMsg["build_messages()\n• text content\n• image_url × N images\n• video_url × N videos/chunks"]
+        MergeBody["merge_extra_body()\nmm_processor_kwargs\n  • fps / do_sample_frames\nchat_template_kwargs\n  • enable_thinking"]
+    end
+
+    API["🚀 vLLM  POST /v1/chat/completions"]
+    Result["📊 RunResult\noutput_text · timings · media_metadata"]
+
+    Upload --> Probe
+    HeightParam --> ImgCheck
+    HeightParam --> VidCheck
+    ImgToggle --> ImgCheck
+    VidToggle --> VidCheck
+    FpsParam --> VidScale
+    SegDur & SegOvlp --> BuildRanges
+    SegWork --> ExtractClips
+    SafeSamp & SampFps --> MergeBody
+
+    Probe --> ImgCheck
+    ImgCheck -- "Yes" --> ImgScale --> Encode
+    ImgCheck -- "No"  --> ImgOrig  --> Encode
+
+    Probe --> VidCheck
+    VidCheck -- "Yes" --> VidScale --> SegCheck
+    VidCheck -- "No"  --> VidOrig  --> SegCheck
+
+    SegCheck -- "Yes" --> BuildRanges --> ExtractClips --> Encode
+    SegCheck -- "No"  --> NoChunk --> Encode
+
+    Encode --> BuildMsg --> MergeBody --> API --> Result
+```
+
 ## References
 
 - https://docs.vllm.ai/en/stable/features/multimodal_inputs/
