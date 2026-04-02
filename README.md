@@ -237,12 +237,12 @@ flowchart TD
     Chunk      -- "No"  --> Full               --> vLLM
     vLLM       --> Result
 
-    classDef ui        fill:#4A90D9,stroke:#2C5F8A,color:#fff,rx:8
-    classDef proc      fill:#5BA85A,stroke:#3A7039,color:#fff,rx:8
+    classDef ui        fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    classDef proc      fill:#5BA85A,stroke:#3A7039,color:#fff
     classDef decision  fill:#E8A838,stroke:#B07820,color:#fff
-    classDef branch    fill:#7B68C8,stroke:#5248A0,color:#fff,rx:8
-    classDef server    fill:#E05C5C,stroke:#A83838,color:#fff,rx:8
-    classDef result    fill:#4ABFBF,stroke:#2E8888,color:#fff,rx:8
+    classDef branch    fill:#7B68C8,stroke:#5248A0,color:#fff
+    classDef server    fill:#E05C5C,stroke:#A83838,color:#fff
+    classDef result    fill:#4ABFBF,stroke:#2E8888,color:#fff
 
     class UI        ui
     class Preprocess proc
