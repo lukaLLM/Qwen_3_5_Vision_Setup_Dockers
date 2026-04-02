@@ -244,12 +244,12 @@ flowchart TD
     classDef server    fill:#E05C5C,stroke:#A83838,color:#fff
     classDef result    fill:#4ABFBF,stroke:#2E8888,color:#fff
 
-    class UI        ui
+    class UI ui
     class Preprocess proc
-    class Chunk     decision
+    class Chunk decision
     class Segments,Full,Parallel branch
-    class vLLM      server
-    class Result    result
+    class vLLM server
+    class Result result
 ```
 
 ## References
